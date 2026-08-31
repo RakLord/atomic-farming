@@ -92,6 +92,11 @@ func (g *Game) handleInput() {
 		return
 	}
 
+	if g.uiState.SeedIndexOpen {
+		g.handleSeedIndexInput()
+		return
+	}
+
 	mx, my := ebiten.CursorPosition()
 	pos, onFarm := cellAt(g.state.Grid, mx, my)
 	input.Hover(g.state, g.uiState, pos, onFarm)
@@ -109,12 +114,42 @@ func (g *Game) handleInput() {
 func (g *Game) buySeed(id sim.SeedOfferID) { input.BuySeed(g.state, g.uiState, id) }
 func (g *Game) buyUnlock(id sim.UnlockID)  { input.BuyUnlock(g.state, g.uiState, id) }
 func (g *Game) selectSeed(index int)       { input.SelectSeed(g.state, g.uiState, index) }
+func (g *Game) discardSeed(index int)      { input.DiscardSeed(g.state, g.uiState, index) }
+
+func (g *Game) clickSeedGroup(group sim.SeedGroup) {
+	input.ClickSeedGroup(g.state, g.uiState, group)
+}
+
+// handleSeedIndexInput drives the seed picker. It runs instead of farm input
+// while the index is open, so a click meant for one of its buttons cannot also
+// sow the plot behind it.
+func (g *Game) handleSeedIndexInput() {
+	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+		g.uiState.CloseSeedIndex()
+		return
+	}
+	if _, wheel := ebiten.Wheel(); wheel != 0 {
+		step := -1
+		if wheel < 0 {
+			step = 1
+		}
+		total := len(g.state.Inventory.StacksOfKind(g.uiState.SeedIndexKind))
+		g.uiState.ScrollSeedIndex(step, total, indexRows)
+	}
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		mx, my := ebiten.CursorPosition()
+		g.handleSeedIndexClick(mx, my)
+	}
+}
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(colorBG)
 	g.drawHeader(screen)
 	g.drawFarm(screen)
 	g.drawPanel(screen)
+	if g.uiState.SeedIndexOpen {
+		g.drawSeedIndex(screen)
+	}
 	if g.lab.Open {
 		g.drawLab(screen)
 	}

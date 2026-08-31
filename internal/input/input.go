@@ -92,6 +92,41 @@ func harvestAt(s *sim.GameState, u *ui.UIState, p sim.Position) {
 	}
 }
 
+// ClickSeedGroup queues a group's default line, or opens the index when there
+// is more than one line to choose between.
+//
+// The common case — sow a stem, any stem — must stay a single click, so a
+// group with one line never makes the player open a picker to confirm it.
+func ClickSeedGroup(s *sim.GameState, u *ui.UIState, g sim.SeedGroup) {
+	if s == nil || u == nil {
+		return
+	}
+	if len(g.Stacks) <= 1 {
+		SelectSeed(s, u, g.DefaultStack(&s.Inventory))
+		return
+	}
+	u.OpenSeedIndex(g.Kind)
+}
+
+// DiscardSeed bins an entire line.
+func DiscardSeed(s *sim.GameState, u *ui.UIState, index int) {
+	if s == nil || u == nil || index < 0 || index >= len(s.Inventory.Stacks) {
+		return
+	}
+	stack := s.Inventory.Stacks[index]
+	name := sim.SeedStrainName(stack)
+	if u.IsSeedSelected(stack) {
+		u.ClearSeed()
+	}
+	if s.Inventory.Discard(stack.Kind, stack.Genome) {
+		u.Notify("Discarded " + name + " " + stack.Genome.Label())
+	}
+	// The index is keyed on a species, so it closes once that species is gone.
+	if len(s.Inventory.StacksOfKind(stack.Kind)) == 0 {
+		u.CloseSeedIndex()
+	}
+}
+
 // SelectSeed queues an inventory stack for planting.
 func SelectSeed(s *sim.GameState, u *ui.UIState, index int) {
 	if s == nil || u == nil || index < 0 || index >= len(s.Inventory.Stacks) {

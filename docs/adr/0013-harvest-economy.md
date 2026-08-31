@@ -1,6 +1,6 @@
 # ADR 0013 — The harvest economy
 
-**Status:** accepted.
+**Status:** accepted; §4 superseded by ADR 0014.
 **Date:** 2026-08-31.
 
 ## Context
@@ -29,7 +29,7 @@ Unit value is `(1 + Quality) × (1 + 4·Density)` in permille, times `SellPriceM
 
 Counts are integers and money is `bignum.Decimal`, per ADR 0010.
 
-**4. Harvested seeds carry the parent genome, mutated.**
+**4. Harvested seeds carry the parent genome, mutated.** *(Superseded by ADR 0014: the per-allele rate below left the barn full of indistinguishable singleton lines. Self-seeding now gets one roll for one single-step change, and drift is bought through irradiation upgrades instead.)*
 
 This is what keeps the game moving. Without it every plant would stay genetically identical to the shop seed it came from, the gene pool would never drift, and no predicate strain could ever be discovered by playing — the whole naming system would only label things the player bought.
 

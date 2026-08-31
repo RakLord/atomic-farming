@@ -23,6 +23,10 @@ type GlobalModifiers struct {
 	SellPriceMul bignum.Decimal `json:"sell_price_mul"`
 	// SeedCostMul scales seed purchase costs.
 	SeedCostMul bignum.Decimal `json:"seed_cost_mul"`
+	// MutationRateMul scales how often a self-seeded seed carries a copy
+	// error. The base rate is deliberately near-never, so this is what makes
+	// deliberate drift possible at all.
+	MutationRateMul bignum.Decimal `json:"mutation_rate_mul"`
 	// ExtraPlots is a budget of free plots granted on top of the base farm
 	// size at the start of every run. Read by StartingGridSize, which spends
 	// it on whole rows and columns so the farm stays rectangular.
@@ -47,6 +51,9 @@ func (m GlobalModifiers) Normalized() GlobalModifiers {
 	}
 	if m.SeedCostMul.IsZero() {
 		m.SeedCostMul = bignum.One()
+	}
+	if m.MutationRateMul.IsZero() {
+		m.MutationRateMul = bignum.One()
 	}
 	return m
 }

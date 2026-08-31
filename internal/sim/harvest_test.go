@@ -144,51 +144,112 @@ func TestSellPriceModifierScalesTheHarvest(t *testing.T) {
 	}
 }
 
-// TestHarvestedSeedsCarryTheParentGenome is the mechanism that keeps the gene
-// pool moving. Without the mutation, every plant would stay identical to the
-// shop seed and no strain could ever be discovered by playing.
-func TestHarvestedSeedsCarryTheParentGenome(t *testing.T) {
+// harvestRepeatedly plants, ripens and gathers the same genome n times,
+// returning how many distinct lines ended up in the barn.
+func harvestRepeatedly(t *testing.T, s *GameState, g plant.Genome, n int) int {
+	t.Helper()
+	pos := Position{}
+	for i := 0; i < n; i++ {
+		readyPlot(t, s, pos, g)
+		if _, err := s.Harvest(pos); err != nil {
+			t.Fatalf("Harvest: %v", err)
+		}
+	}
+	return len(s.Inventory.Stacks)
+}
+
+// TestSelfSeedingIsCloning is the regression test for the bug this model
+// exists to fix: a barn full of near-identical singleton lines after a handful
+// of harvests. Ordinary play must leave the gene pool where it started.
+func TestSelfSeedingIsCloning(t *testing.T) {
+	s := NewGameStateWithSeed(5150)
+	s.Inventory = Inventory{}
 	parent := reliableGenome(map[plant.GeneID]plant.Allele{
-		plant.GeneYieldAmount: 255, // maximise the seed return chance
+		plant.GeneYieldAmount: 255, // maximise seed return, so the sample is large
+	})
+
+	lines := harvestRepeatedly(t, s, parent, 300)
+	if lines > 3 {
+		t.Errorf("300 harvests produced %d distinct lines; ordinary play should barely drift at all", lines)
+	}
+
+	seeds := s.Inventory.Total()
+	if seeds < 100 {
+		t.Fatalf("only %d seeds returned across 300 harvests; the sample is too small to mean anything", seeds)
+	}
+	// Whatever did come back must be within one step of its parent.
+	for _, stack := range s.Inventory.Stacks {
+		steps := 0
+		for i := 0; i < plant.GeneCount; i++ {
+			for _, d := range []int{
+				int(stack.Genome[i].A) - int(parent[i].A),
+				int(stack.Genome[i].B) - int(parent[i].B),
+			} {
+				if d < 0 {
+					d = -d
+				}
+				steps += d
+			}
+		}
+		if steps > 1 {
+			t.Errorf("a returned seed is %d steps from its parent; self-seeding should move one at most", steps)
+		}
+	}
+	t.Logf("300 harvests, %d seeds returned, %d distinct lines", seeds, lines)
+}
+
+// TestIrradiationRestoresDrift: with the base rate near-never, the bred
+// strains would be unreachable without a way to buy into mutation.
+func TestIrradiationRestoresDrift(t *testing.T) {
+	s := NewGameStateWithSeed(5150)
+	s.Inventory = Inventory{}
+	s.Unlocks[UnlockIrradiationI] = true
+	s.Unlocks[UnlockIrradiationII] = true
+	rebuildModifiers(s)
+
+	parent := reliableGenome(map[plant.GeneID]plant.Allele{
+		plant.GeneYieldAmount: 255,
 		plant.GeneMutability:  255,
 	})
 
-	returned, drifted := 0, 0
-	for seed := uint64(1); seed <= 60; seed++ {
-		s := NewGameState()
-		s.WorldSeed = seed
-		s.Inventory = Inventory{}
-		pos := Position{}
-		readyPlot(t, s, pos, parent)
+	lines := harvestRepeatedly(t, s, parent, 300)
+	if lines < 8 {
+		t.Errorf("300 irradiated harvests produced only %d distinct lines; drift is not buyable", lines)
+	}
+	t.Logf("300 irradiated harvests produced %d distinct lines", lines)
+}
 
-		res, err := s.Harvest(pos)
-		if err != nil {
-			t.Fatalf("Harvest: %v", err)
-		}
-		returned += res.Seeds
+func TestMutabilityAndIrradiationScaleTheRate(t *testing.T) {
+	plain := plant.ExpressFull(genomeWith(map[plant.GeneID]plant.Allele{plant.GeneMutability: 0}))
+	mutable := plant.ExpressFull(genomeWith(map[plant.GeneID]plant.Allele{plant.GeneMutability: 255}))
+	none := GlobalModifiers{}.Normalized()
+	boosted := GlobalModifiers{MutationRateMul: bignum.MustParse("144")}.Normalized()
 
-		for _, stack := range s.Inventory.Stacks {
-			if stack.Genome != parent {
-				drifted++
-			}
-			for i := 0; i < plant.GeneCount; i++ {
-				for _, d := range []int{
-					int(stack.Genome[i].A) - int(parent[i].A),
-					int(stack.Genome[i].B) - int(parent[i].B),
-				} {
-					if d > plant.MaxMutationStep || d < -plant.MaxMutationStep {
-						t.Fatalf("gene %d drifted by %d in one generation", i, d)
-					}
-				}
-			}
-		}
+	base := SelfSeedMutationPPMFor(plain, none)
+	byGene := SelfSeedMutationPPMFor(mutable, none)
+	byUpgrade := SelfSeedMutationPPMFor(plain, boosted)
+	both := SelfSeedMutationPPMFor(mutable, boosted)
+
+	if base != SelfSeedMutationPPM {
+		t.Errorf("baseline rate is %d ppm, want %d", base, SelfSeedMutationPPM)
+	}
+	if byGene <= base {
+		t.Errorf("Mutability did not raise the rate: %d vs %d ppm", byGene, base)
+	}
+	if byUpgrade <= base {
+		t.Errorf("irradiation did not raise the rate: %d vs %d ppm", byUpgrade, base)
+	}
+	if both <= byGene || both <= byUpgrade {
+		t.Errorf("the two do not compose: gene %d, upgrade %d, both %d ppm", byGene, byUpgrade, both)
+	}
+	if both > MaxSelfSeedMutationPPM {
+		t.Errorf("combined rate %d ppm exceeds the ceiling %d", both, MaxSelfSeedMutationPPM)
 	}
 
-	if returned == 0 {
-		t.Fatal("no harvest returned a seed")
-	}
-	if drifted == 0 {
-		t.Error("no returned seed differed from its parent; the gene pool would never move")
+	// Even absurd stacking must not make every seed a mutant.
+	absurd := SelfSeedMutationPPMFor(mutable, GlobalModifiers{MutationRateMul: bignum.MustParse("1e9")}.Normalized())
+	if absurd != MaxSelfSeedMutationPPM {
+		t.Errorf("an extreme multiplier gave %d ppm, want the ceiling %d", absurd, MaxSelfSeedMutationPPM)
 	}
 }
 

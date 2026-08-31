@@ -40,17 +40,18 @@ type unlockRow struct {
 
 type seedRow struct {
 	rect  rect
-	index int
+	group int // index into panelLayout.groups
 }
 
 type panelLayout struct {
-	offers    []offerRow
-	unlocks   []unlockRow
-	seeds     []seedRow
-	seedsY    int
-	unlocksY  int
-	plotY     int
-	hiddenBad int
+	offers   []offerRow
+	unlocks  []unlockRow
+	seeds    []seedRow
+	groups   []sim.SeedGroup
+	seedsY   int
+	unlocksY int
+	plotY    int
+	hidden   int
 }
 
 // panelLayout computes every clickable row for the current state.
@@ -88,10 +89,13 @@ func (g *Game) panelLayout() panelLayout {
 	y += sectionGap
 	l.seedsY = y
 	y += 22
-	stacks := g.state.Inventory.Stacks
-	for i := range stacks {
+	// Rows are groups, not stacks: a species' unnamed lines collapse into one
+	// row so ordinary drift never fills the panel, while named strains stay
+	// visible in their own right.
+	l.groups = g.state.GroupSeeds()
+	for i := range l.groups {
 		if len(l.seeds) >= maxSeedRows {
-			l.hiddenBad = len(stacks) - len(l.seeds)
+			l.hidden = len(l.groups) - len(l.seeds)
 			break
 		}
 		l.seeds = append(l.seeds, seedRow{rect{x, y, panelInnerW, seedRowH - 3}, i})
@@ -120,7 +124,7 @@ func (g *Game) handlePanelClick(mx, my int) {
 	}
 	for _, row := range l.seeds {
 		if row.rect.contains(mx, my) {
-			g.selectSeed(row.index)
+			g.clickSeedGroup(l.groups[row.group])
 			return
 		}
 	}
@@ -156,10 +160,10 @@ func (g *Game) drawPanel(dst *ebiten.Image) {
 		drawText(dst, "None — buy one above", fontSmall, x, l.seedsY+24, colorTextMuted)
 	}
 	for _, row := range l.seeds {
-		g.drawSeedRow(dst, row)
+		g.drawSeedRow(dst, l.groups[row.group], row.rect)
 	}
-	if l.hiddenBad > 0 {
-		drawTextRight(dst, fmt.Sprintf("+%d more", l.hiddenBad), fontSmall,
+	if l.hidden > 0 {
+		drawTextRight(dst, fmt.Sprintf("+%d more", l.hidden), fontSmall,
 			panelX+panelW-panelPadX, l.seedsY, colorTextMuted)
 	}
 
@@ -189,30 +193,36 @@ func (g *Game) drawBuyRow(dst *ebiten.Image, r rect, name, desc string, cost big
 	drawTextRight(dst, price, fontBody, r.x+r.w-10, r.y+11, priceColor)
 }
 
-func (g *Game) drawSeedRow(dst *ebiten.Image, row seedRow) {
-	stack := g.state.Inventory.Stacks[row.index]
-	selected := g.uiState.IsSeedSelected(stack)
+func (g *Game) drawSeedRow(dst *ebiten.Image, group sim.SeedGroup, r rect) {
+	selected := false
+	for _, i := range group.Stacks {
+		if i < len(g.state.Inventory.Stacks) && g.uiState.IsSeedSelected(g.state.Inventory.Stacks[i]) {
+			selected = true
+			break
+		}
+	}
 
 	bg := colorRowBG
 	if selected {
 		bg = colorRowSelected
 	}
-	fillRect(dst, row.rect.x, row.rect.y, row.rect.w, row.rect.h, bg)
+	fillRect(dst, r.x, r.y, r.w, r.h, bg)
 
-	name := sim.SeedStrainName(stack)
 	label := colorText
-	if strain, ok := sim.IdentifyStrain(stack.Kind, stack.Genome, sim.SeedPhenotype(stack)); ok {
-		label = rarityColor(strain.Rarity)
+	if group.Named {
+		label = rarityColor(group.Strain.Rarity)
 	}
-	drawText(dst, name, fontBody, row.rect.x+10, row.rect.y+4, label)
-	// Unnamed stacks are all called after their species, so show the strain
-	// code too — otherwise a barn full of drifting seeds is six rows of "Stem".
-	if name == sim.CropDisplayName(stack.Kind) {
-		w, _ := textWidth(name, fontBody)
-		drawText(dst, stack.Genome.Label(), fontSmall, row.rect.x+18+w, row.rect.y+6, colorTextMuted)
+	drawText(dst, group.Name, fontBody, r.x+10, r.y+4, label)
+
+	// More than one line behind a row means clicking it opens the index, so
+	// say so rather than letting the extra click be a surprise.
+	if len(group.Stacks) > 1 {
+		w, _ := textWidth(group.Name, fontBody)
+		drawText(dst, fmt.Sprintf("%d lines", len(group.Stacks)), fontSmall,
+			r.x+18+w, r.y+6, colorTextMuted)
 	}
-	drawTextRight(dst, fmt.Sprintf("x%d", stack.Count), fontBody,
-		row.rect.x+row.rect.w-10, row.rect.y+4, colorTextMuted)
+	drawTextRight(dst, fmt.Sprintf("x%d", group.Count), fontBody,
+		r.x+r.w-10, r.y+4, colorTextMuted)
 }
 
 func (g *Game) drawPlotDetail(dst *ebiten.Image, y int) {

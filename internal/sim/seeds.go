@@ -90,3 +90,98 @@ func (inv *Inventory) prune() {
 	}
 	inv.Stacks = kept
 }
+
+// Discard removes an entire line from the inventory.
+//
+// The unit a player wants to bin is a lineage, not a single seed — nobody
+// throws away one seed of a strain they have decided against.
+func (inv *Inventory) Discard(kind CropKind, g plant.Genome) bool {
+	i := inv.indexOf(kind, g)
+	if i < 0 {
+		return false
+	}
+	inv.Stacks = append(inv.Stacks[:i], inv.Stacks[i+1:]...)
+	return true
+}
+
+// SeedGroup is one row of the seed list: either a species' unnamed holdings
+// collapsed together, or a single named strain.
+//
+// Grouping is a view over the stored inventory, not a change to it, so the
+// save format is untouched.
+type SeedGroup struct {
+	Kind   CropKind
+	Name   string
+	Strain NamedStrain
+	Named  bool
+	// Stacks indexes into Inventory.Stacks.
+	Stacks []int
+	Count  int
+}
+
+// GroupSeeds buckets the inventory for display.
+//
+// Unnamed seeds of a species collapse into one row — they are the pile nobody
+// wants to scroll — while every named strain gets its own, because those are
+// exactly the ones worth choosing between.
+//
+// Groups come out in first-seen order over the stacks. The map here is only a
+// lookup; iterating it would reshuffle the list between frames, the same trap
+// IdentifyStrain avoids.
+func (s *GameState) GroupSeeds() []SeedGroup {
+	type key struct {
+		kind   CropKind
+		strain StrainID
+	}
+	at := map[key]int{}
+	var groups []SeedGroup
+
+	for i, stack := range s.Inventory.Stacks {
+		strain, named := IdentifyStrain(stack.Kind, stack.Genome, SeedPhenotype(stack))
+		k := key{kind: stack.Kind}
+		name := CropDisplayName(stack.Kind)
+		if named {
+			k.strain, name = strain.ID, strain.Name
+		}
+
+		gi, seen := at[k]
+		if !seen {
+			groups = append(groups, SeedGroup{Kind: stack.Kind, Name: name, Strain: strain, Named: named})
+			gi = len(groups) - 1
+			at[k] = gi
+		}
+		groups[gi].Stacks = append(groups[gi].Stacks, i)
+		groups[gi].Count += stack.Count
+	}
+	return groups
+}
+
+// DefaultStack is the line a group sows when the player has not picked one:
+// the most numerous, ties going to the earliest.
+//
+// Predictable beats clever here — the bulk line is almost always the one being
+// cultivated, and a player who wants a specific line opens the index.
+func (g SeedGroup) DefaultStack(inv *Inventory) int {
+	best, bestCount := -1, 0
+	for _, i := range g.Stacks {
+		if i < 0 || i >= len(inv.Stacks) {
+			continue
+		}
+		if c := inv.Stacks[i].Count; c > bestCount {
+			best, bestCount = i, c
+		}
+	}
+	return best
+}
+
+// StacksOfKind lists the inventory positions holding seeds of one species, in
+// inventory order. It is what the seed index shows.
+func (inv *Inventory) StacksOfKind(kind CropKind) []int {
+	var out []int
+	for i, stack := range inv.Stacks {
+		if stack.Kind == kind {
+			out = append(out, i)
+		}
+	}
+	return out
+}

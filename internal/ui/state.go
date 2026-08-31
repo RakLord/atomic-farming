@@ -25,9 +25,36 @@ type UIState struct {
 	SeedGenome plant.Genome
 	HasSeed    bool
 
+	// The seed index: the picker for choosing between lines of one species.
+	SeedIndexOpen   bool
+	SeedIndexKind   sim.CropKind
+	SeedIndexScroll int
+
 	// Notice is the last action's result, shown briefly.
 	Notice      string
 	noticeTicks int
+}
+
+// OpenSeedIndex shows the picker for one species.
+func (u *UIState) OpenSeedIndex(kind sim.CropKind) {
+	u.SeedIndexOpen, u.SeedIndexKind, u.SeedIndexScroll = true, kind, 0
+}
+
+func (u *UIState) CloseSeedIndex() { u.SeedIndexOpen = false }
+
+// ScrollSeedIndex moves the picker's viewport, clamped to the row count.
+func (u *UIState) ScrollSeedIndex(delta, rows, visible int) {
+	u.SeedIndexScroll += delta
+	max := rows - visible
+	if max < 0 {
+		max = 0
+	}
+	if u.SeedIndexScroll > max {
+		u.SeedIndexScroll = max
+	}
+	if u.SeedIndexScroll < 0 {
+		u.SeedIndexScroll = 0
+	}
 }
 
 func NewUIState() *UIState { return &UIState{} }

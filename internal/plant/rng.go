@@ -71,6 +71,27 @@ func Chance(seed uint64, p Purpose, salt uint64, bp int) bool {
 	return Roll(seed, p, salt, BasisPoints) < uint64(bp)
 }
 
+// PartsPerMillion is the denominator for probabilities too fine to express in
+// basis points.
+//
+// A one-in-ten-thousand event is 1 bp, and scaling 1 bp by anything and
+// dividing back down truncates straight to 1 again — so a gene meant to make
+// such an event more likely would silently do nothing. Parts per million give
+// the headroom that scaling needs.
+const PartsPerMillion = 1_000_000
+
+// ChancePPM reports whether an event of probability ppm parts per million
+// occurs. Integer-only, like Chance.
+func ChancePPM(seed uint64, p Purpose, salt uint64, ppm int) bool {
+	if ppm <= 0 {
+		return false
+	}
+	if ppm >= PartsPerMillion {
+		return true
+	}
+	return Roll(seed, p, salt, PartsPerMillion) < uint64(ppm)
+}
+
 // UnitFloat returns a deterministic float64 in [0, 1).
 //
 // Visual use only — jitter, wobble, anything that only reaches pixels. Never

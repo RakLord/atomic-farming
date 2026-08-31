@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"atomicfarming/internal/bignum"
+	"atomicfarming/internal/plant"
 	"atomicfarming/internal/sim"
 	// The Stem registers itself here, giving these tests a real crop and a
 	// real shop to act on rather than a stand-in.
@@ -150,5 +151,86 @@ func TestSelectSeedIgnoresBadIndices(t *testing.T) {
 	SelectSeed(s, u, 999)
 	if u.HasSeed {
 		t.Error("an out-of-range index selected a seed")
+	}
+}
+
+func TestClickingASingleLineGroupSowsItWithoutAPicker(t *testing.T) {
+	s, u := newGame()
+	groups := s.GroupSeeds()
+	if len(groups) != 1 || len(groups[0].Stacks) != 1 {
+		t.Fatalf("a new farm should hold one line, got %+v", groups)
+	}
+
+	ClickSeedGroup(s, u, groups[0])
+	if u.SeedIndexOpen {
+		t.Error("a group with one line opened the picker; the common case must stay one click")
+	}
+	if !u.HasSeed {
+		t.Error("clicking a single-line group did not queue its seed")
+	}
+}
+
+func TestClickingAMultiLineGroupOpensTheIndex(t *testing.T) {
+	s, u := newGame()
+	s.Inventory.Add(crops.KindStem, plant.RandomGenome(41), 2)
+	s.Inventory.Add(crops.KindStem, plant.RandomGenome(42), 1)
+
+	groups := s.GroupSeeds()
+	if len(groups) != 1 {
+		t.Fatalf("unnamed stems should collapse to one group, got %d", len(groups))
+	}
+	ClickSeedGroup(s, u, groups[0])
+
+	if !u.SeedIndexOpen {
+		t.Fatal("a group with several lines did not open the picker")
+	}
+	if u.SeedIndexKind != crops.KindStem {
+		t.Errorf("the picker opened on %q, want the stem", u.SeedIndexKind)
+	}
+}
+
+func TestDiscardRemovesTheLineAndUnqueuesIt(t *testing.T) {
+	s, u := newGame()
+	s.Inventory = sim.Inventory{}
+	doomed := plant.RandomGenome(43)
+	s.Inventory.Add(crops.KindStem, doomed, 3)
+	s.Inventory.Add(crops.KindStem, plant.RandomGenome(44), 1)
+
+	SelectSeed(s, u, 0)
+	if !u.HasSeed {
+		t.Fatal("the seed was not queued")
+	}
+
+	DiscardSeed(s, u, 0)
+	if u.HasSeed {
+		t.Error("discarding the queued line left it queued; sowing would fail silently")
+	}
+	if s.Inventory.Total() != 1 {
+		t.Errorf("%d seeds remain, want 1", s.Inventory.Total())
+	}
+	if !strings.Contains(u.Notice, "Discarded") {
+		t.Errorf("notice was %q, want a discard confirmation", u.Notice)
+	}
+}
+
+func TestDiscardingTheLastLineClosesTheIndex(t *testing.T) {
+	s, u := newGame()
+	s.Inventory = sim.Inventory{}
+	s.Inventory.Add(crops.KindStem, plant.RandomGenome(45), 1)
+	u.OpenSeedIndex(crops.KindStem)
+
+	DiscardSeed(s, u, 0)
+	if u.SeedIndexOpen {
+		t.Error("the picker stayed open over an empty species")
+	}
+}
+
+func TestDiscardIgnoresBadIndices(t *testing.T) {
+	s, u := newGame()
+	before := s.Inventory.Total()
+	DiscardSeed(s, u, -1)
+	DiscardSeed(s, u, 99)
+	if s.Inventory.Total() != before {
+		t.Error("an out-of-range discard changed the inventory")
 	}
 }

@@ -39,6 +39,9 @@ func drawAllele(p GenePair, seed, salt uint64) Allele {
 // (basis points) chance of shifting by 1..MaxMutationStep in either
 // direction, clamped to the allele range.
 //
+// This is the model for a cross, where shuffling several genes at once is the
+// point. A plant seeding itself uses MutateOnce instead — see the note there.
+//
 // rateBP <= 0 returns the genome unchanged, so an unmutated breed costs
 // nothing.
 func Mutate(g Genome, seed uint64, rateBP int) Genome {
@@ -69,6 +72,54 @@ func mutateAllele(a Allele, seed, salt uint64, rateBP int) Allele {
 		v = 255
 	}
 	return Allele(v)
+}
+
+// MutateOnce gives a genome a single chance of a copy error. When it fires,
+// exactly one allele moves exactly one step; otherwise the genome comes back
+// untouched.
+//
+// This is the model for a plant seeding itself, and it is deliberately a
+// different shape from Mutate. Rolling every allele independently — however
+// low the rate — smears a little change across several genes at once, which
+// leaves a barn full of near-identical lines nobody can tell apart or choose
+// between. One roll, one gene, one step makes a mutation an event you can
+// point at, and leaves every other seed a clean copy.
+//
+// See docs/adr/0014-self-seeding-is-cloning.md.
+func MutateOnce(g Genome, seed uint64, chancePPM int) (Genome, bool) {
+	if chancePPM <= 0 {
+		return g, false
+	}
+	if !ChancePPM(seed, PurposeMutation, 0, chancePPM) {
+		return g, false
+	}
+
+	gene := Roll(seed, PurposeMutation, 1, uint64(GeneCount))
+	pair := g[gene]
+
+	target := &pair.A
+	if Roll(seed, PurposeMutation, 2, 2) == 1 {
+		target = &pair.B
+	}
+
+	step := 1
+	if Roll(seed, PurposeMutation, 3, 2) == 0 {
+		step = -1
+	}
+	// Reflect at the boundaries rather than clamping. Clamping would let a
+	// mutation fire and change nothing, breaking the one-step guarantee this
+	// function exists to make.
+	v := int(*target) + step
+	switch {
+	case v < 0:
+		v = 1
+	case v > 255:
+		v = 254
+	}
+	*target = Allele(v)
+
+	g[gene] = pair
+	return g, true
 }
 
 // MutationRateBP is the per-allele mutation chance for an offspring of two

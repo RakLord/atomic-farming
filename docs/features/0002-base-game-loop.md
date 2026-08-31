@@ -38,11 +38,17 @@ A harvest can fail. **Harvest Chance** decides it, and a failure loses the crop 
 
 ## Seeds and drift
 
-A harvest returns seeds carrying the parent's genome — **slightly mutated**. That is how a line drifts: sow, gather, sow the children, and the strain wanders a little each generation.
+A harvest returns seeds carrying the parent's genome. **A seed is very nearly a clone**: it gets a single chance of a copy error, about one in ten thousand, and otherwise comes back identical. Sowing and gathering a line will not, on its own, change it.
 
 Returns average a little under one seed per harvest, so a farm slowly runs down and the shop stays worth visiting.
 
-Seeds stack by exact genome, so the barn shows how many distinct lines are in play. Unnamed stacks are listed by strain code (`843A-1CA0`) so they can be told apart.
+To make a line move you buy into it. The **Seed Irradiator** makes mutations twelve times as likely, and the **Reactor Bed** twelve times likelier again; a plant's own **Mutability** gene multiplies that further. With both upgrades and a mutable line, drift becomes a real generation-by-generation process. Without them, your stems breed true.
+
+## The barn
+
+Seeds are listed one row per species — `Stem  7 lines  x24` — so ordinary drift never fills the panel. **Named strains get their own row**, in their rarity colour, because those are the ones worth picking out.
+
+Clicking a species with a single line sows it. Clicking one with several opens the **seed index**: every line you hold, drawn as the plant it grows into, with its Density, Growth and Yield, and buttons to sow it or discard it. Discarding takes the whole line.
 
 ## Named strains
 

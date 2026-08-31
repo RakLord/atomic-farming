@@ -59,6 +59,10 @@ Entry point: `cmd/game/main.go` loads the save (or starts fresh), wires state in
 
 **The grid is runtime-dimensioned.** `Grid.W`/`H` with a flat `Plots` slice, not a fixed array — the farm grows. Render geometry is computed from the current dimensions; `cellAt` must stay the exact inverse of `cellRect`. See `docs/adr/0004-dynamic-grid-dimensions.md`.
 
+**Self-seeding clones; crossing recombines.** A harvested seed goes through `plant.MutateOnce` — one roll, one allele, one step — not `plant.Mutate`, which rolls all 90 alleles and belongs to crossing. Rolling per allele at any rate that ever fires smears change across several genes and fills the barn with indistinguishable singleton lines; that is a bug this project already shipped once. See `docs/adr/0014-self-seeding-is-cloning.md`.
+
+**Seed grouping must iterate in a fixed order.** `GroupSeeds` uses a map only for lookup and emits groups in first-seen order over the stacks; iterating the map would reshuffle the seed list between frames.
+
 **The death roll is once per stage, never once per tick.** A plant lives for hundreds of ticks, so a per-tick roll compounds and even one basis point kills nearly everything before maturity — a rate that reads as harmless and is not. Pinned by `TestDeathIsRolledPerStageNotPerTick`.
 
 **`IdentifyStrain` iterates `StrainCatalogOrder`, never the catalog map.** Go randomises map order, so resolving through the map lets a plant name itself differently between frames.

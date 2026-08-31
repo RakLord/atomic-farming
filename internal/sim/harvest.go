@@ -26,11 +26,18 @@ const (
 	MaxSeedReturnBP = 6500
 	SeedReturnRolls = 2
 
-	// SelfSeedBonusBP is added to the genetic mutation rate when a plant seeds
-	// itself. Genetics alone contributes at most 40 bp, which would take
-	// hundreds of harvests to drift anywhere; this makes a strain visibly
-	// wander within a session while still leaving Mutability meaningful.
-	SelfSeedBonusBP = 120
+	// SelfSeedMutationPPM is the baseline chance, in parts per million, that a
+	// self-seeded seed carries a copy error — about one in ten thousand.
+	//
+	// A plant seeding itself is very nearly cloning. Variation is meant to come
+	// from crossing, not from the ordinary act of harvesting.
+	SelfSeedMutationPPM = 100
+	// MaxMutabilityBoostPermille is what the Mutability gene is worth at its
+	// maximum: ten times the baseline rate.
+	MaxMutabilityBoostPermille = 9000
+	// MaxSelfSeedMutationPPM caps the combined rate, so no stacking of genes
+	// and upgrades can make every seed a mutant.
+	MaxSelfSeedMutationPPM = 250_000
 )
 
 var (
@@ -132,23 +139,42 @@ func (s *GameState) Harvest(p Position) (HarvestResult, error) {
 	return result, nil
 }
 
-// returnSeeds gives back seeds carrying the harvested plant's genome, each
-// independently mutated.
+// SelfSeedMutationPPMFor is a plant's chance of a copy error when it seeds
+// itself, in parts per million.
 //
-// The mutation is what keeps the gene pool moving. Without it every plant
-// would stay genetically identical to the shop seed it came from, no strain
-// could ever be discovered by playing, and the whole naming system would only
-// ever label things the player bought.
+// The baseline is near-never. The Mutability gene is worth up to ten times
+// that, and irradiation upgrades multiply it further, so drift is something a
+// player deliberately buys into rather than something that happens to them.
+func SelfSeedMutationPPMFor(p plant.Phenotype, mods GlobalModifiers) int {
+	mutability := 1000 + int(p.Get(plant.GeneMutability))*MaxMutabilityBoostPermille/255
+	ppm := SelfSeedMutationPPM * mutability / 1000
+	ppm = ppm * modifierPermille(mods.MutationRateMul) / 1000
+	if ppm < 0 {
+		return 0
+	}
+	if ppm > MaxSelfSeedMutationPPM {
+		return MaxSelfSeedMutationPPM
+	}
+	return ppm
+}
+
+// returnSeeds gives back seeds carrying the harvested plant's genome.
+//
+// A seed is very nearly a clone: each gets one chance of a single-step copy
+// error, and otherwise comes back identical. Rolling every allele instead —
+// at any rate high enough to ever fire — left the barn full of near-identical
+// lines that were impossible to tell apart or choose between.
+// See docs/adr/0014-self-seeding-is-cloning.md.
 func (s *GameState) returnSeeds(kind CropKind, genome plant.Genome, pheno plant.Phenotype, seed uint64) int {
 	chance := pheno.Scaled(plant.GeneYieldAmount, MinSeedReturnBP, MaxSeedReturnBP)
-	rate := plant.MutationRateBP(pheno, pheno, SelfSeedBonusBP)
+	rate := SelfSeedMutationPPMFor(pheno, s.Modifiers.Normalized())
 
 	given := 0
 	for i := 0; i < SeedReturnRolls; i++ {
 		if !plant.Chance(seed, plant.PurposeSpawn, s.Ticks*uint64(SeedReturnRolls)+uint64(i), chance) {
 			continue
 		}
-		child := plant.Mutate(genome, plant.Mix(seed, plant.PurposeMutation, s.Ticks+uint64(i)), rate)
+		child, _ := plant.MutateOnce(genome, plant.Mix(seed, plant.PurposeMutation, s.Ticks+uint64(i)), rate)
 		s.Inventory.Add(kind, child, 1)
 		given++
 	}
