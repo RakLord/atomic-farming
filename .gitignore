@@ -17,3 +17,7 @@
 
 # OS
 .DS_Store
+
+# Stray tool output
+/live.png
+/.playwright-mcp/
