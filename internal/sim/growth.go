@@ -10,11 +10,23 @@ import (
 // growth replays exactly. See docs/adr/0010-determinism.md.
 const GrowthUnitsPerStage = 1000
 
-// Growth speed bounds, in units per tick. At the default 10 Hz tick rate the
-// slowest plant takes 12.5 seconds per stage and the fastest 2 seconds.
+// Growth speed bounds, in units per tick.
+//
+// The constants are in units per tick, but the number anyone tuning this cares
+// about is seconds, so here is the derivation for the Stem at the default tick
+// rate. A plant needs GrowthUnitsPerStage for each of its three stage
+// transitions, so 3000 units in total:
+//
+//	expressed  22 →  4 units/tick → 750 ticks → 75s  (slowest a Stem can be)
+//	expressed 119 → 15 units/tick → 200 ticks → 20s  (the starter seed)
+//	expressed 255 → 30 units/tick → 100 ticks → 10s  (fastest a Stem can be)
+//
+// A minimum of 1 keeps the clamp in growthPerTick a genuine guard rather than
+// something the Stem relies on: a species whose gene window reached 0 would
+// otherwise sit at 300 seconds.
 const (
-	MinGrowthUnitsPerTick = 8
-	MaxGrowthUnitsPerTick = 50
+	MinGrowthUnitsPerTick = 1
+	MaxGrowthUnitsPerTick = 30
 )
 
 // MaxStageDeathBP is the chance, in basis points, that a plant with the lowest

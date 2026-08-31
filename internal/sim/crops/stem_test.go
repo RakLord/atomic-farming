@@ -3,6 +3,8 @@ package crops
 import (
 	"testing"
 
+	"atomicfarming/internal/bignum"
+
 	"atomicfarming/internal/plant"
 	"atomicfarming/internal/sim"
 )
@@ -200,29 +202,153 @@ func TestStarterSetupIsPlayable(t *testing.T) {
 		paid, worlds, died, ticksTotal/(worlds-died))
 }
 
-func TestStemGrowsInAReasonableTime(t *testing.T) {
-	// Fixed seed: a clock-seeded world would occasionally kill the plant and
-	// turn this timing check into a flake.
+// maturationSeconds grows one Stem of the given genome and reports how long it
+// took. Vitality is maxed so a death roll cannot skew the timing.
+func maturationSeconds(t *testing.T, g plant.Genome) float64 {
+	t.Helper()
 	s := sim.NewGameStateWithSeed(7)
+	s.Inventory = sim.Inventory{}
+	s.Inventory.Add(KindStem, g, 1)
+
 	pos := sim.Position{}
 	if err := s.PlantSeed(pos, 0); err != nil {
 		t.Fatalf("PlantSeed: %v", err)
 	}
-	ticks := 0
-	for i := 0; i < 20000; i++ {
+	for i := 0; i < 100000; i++ {
 		s.Tick()
-		ticks++
 		plot, _ := s.Grid.At(pos)
 		if plot.Crop == nil {
-			t.Fatal("the plant died")
+			t.Fatal("the plant died before ripening")
 		}
 		if plot.Growth.Ready {
-			break
+			return float64(i+1) / float64(sim.DefaultTickRate)
 		}
 	}
-	seconds := float64(ticks) / float64(sim.DefaultTickRate)
-	if seconds < 3 || seconds > 120 {
-		t.Errorf("a default Stem takes %.1fs to mature; that is outside a playable window", seconds)
+	t.Fatal("the plant never ripened")
+	return 0
+}
+
+func stemWithGrowthRate(v plant.Allele) plant.Genome {
+	g := plant.DefaultGenome()
+	g[plant.GeneGrowthRate] = plant.GenePair{A: v, B: v}
+	return g
+}
+
+// TestTheStarterStemTakesTwentySeconds pins the opening pace.
+//
+// This test used to accept anything from 3 to 120 seconds, which is how the
+// starter sat at 9.4s unnoticed. A pacing number nobody asserts is a pacing
+// number that drifts.
+func TestTheStarterStemTakesTwentySeconds(t *testing.T) {
+	offer, ok := sim.SeedShop[OfferStemSeed]
+	if !ok {
+		t.Fatal("the starter offer is not registered")
 	}
-	t.Logf("a default Stem matures in %d ticks (%.1fs)", ticks, seconds)
+	got := maturationSeconds(t, offer.Genome)
+	if got < 19 || got > 21 {
+		t.Errorf("the starter Stem matures in %.1fs, want 20s", got)
+	}
+	t.Logf("starter Stem matures in %.1fs", got)
+}
+
+// TestGrowthRateSpreadIsWide: the gene has to be worth breeding for, not a
+// rounding error next to Density.
+func TestGrowthRateSpreadIsWide(t *testing.T) {
+	stem := &Stem{}
+	window := stem.Ranges()[plant.GeneGrowthRate]
+
+	fastest := maturationSeconds(t, stemWithGrowthRate(255))
+	slowest := maturationSeconds(t, stemWithGrowthRate(0))
+
+	if fastest < 9 || fastest > 11 {
+		t.Errorf("the fastest Stem matures in %.1fs, want about 10s", fastest)
+	}
+	if slowest < 70 || slowest > 80 {
+		t.Errorf("the slowest Stem matures in %.1fs, want about 75s", slowest)
+	}
+	if spread := slowest / fastest; spread < 6 {
+		t.Errorf("growth spread is only %.1fx; the gene barely matters", spread)
+	}
+	t.Logf("Stem matures in %.1fs to %.1fs (gene window %d..%d)",
+		fastest, slowest, window.Min, window.Max)
+}
+
+func TestFieldExtensionWidensTheFarmImmediately(t *testing.T) {
+	s := sim.NewGameStateWithSeed(1)
+	s.Cash = bignum.MustParse("500")
+
+	if s.Grid.W != 3 || s.Grid.H != 3 {
+		t.Fatalf("a new farm is %dx%d, want 3x3", s.Grid.W, s.Grid.H)
+	}
+	if err := sim.PurchaseUnlock(s, sim.UnlockFieldExtension); err != nil {
+		t.Fatalf("PurchaseUnlock: %v", err)
+	}
+	if s.Grid.W != 4 || s.Grid.H != 3 {
+		t.Errorf("after buying Field Extension the farm is %dx%d, want 4x3", s.Grid.W, s.Grid.H)
+	}
+	if want := bignum.MustParse("400"); !s.Cash.Eq(want) {
+		t.Errorf("cash = %s, want %s", s.Cash, want)
+	}
+}
+
+// TestFieldExtensionSurvivesPrestige: you paid for the ground.
+func TestFieldExtensionSurvivesPrestige(t *testing.T) {
+	s := sim.NewGameStateWithSeed(1)
+	s.Cash = bignum.MustParse("500")
+	if err := sim.PurchaseUnlock(s, sim.UnlockFieldExtension); err != nil {
+		t.Fatalf("PurchaseUnlock: %v", err)
+	}
+
+	sim.ApplyLayerReset(s, sim.LayerField)
+
+	if s.Grid.W != 4 || s.Grid.H != 3 {
+		t.Errorf("after a prestige the farm is %dx%d, want the 4x3 you bought", s.Grid.W, s.Grid.H)
+	}
+}
+
+// TestFieldExtensionIsAReachableFirstGoal measures how long $100 actually takes
+// from a standing start. Under a minute and it is not a goal; over several and
+// it is a wall.
+func TestFieldExtensionIsAReachableFirstGoal(t *testing.T) {
+	s := sim.NewGameStateWithSeed(99)
+	cost := sim.SeedCost(s, OfferStemSeed)
+	target := sim.UnlockCatalog[sim.UnlockFieldExtension].Cost
+
+	ticks := 0
+	for ticks < 60*60*sim.DefaultTickRate && s.Cash.LT(target) {
+		// Sow anything sowable, gather anything ready, buy a seed when the
+		// barn is empty and there is cash for one — roughly how the opening
+		// actually plays.
+		for i := range s.Grid.Plots {
+			pos := s.Grid.PositionAt(i)
+			plot, _ := s.Grid.At(pos)
+			switch {
+			case plot.Crop == nil && s.Inventory.Total() > 0:
+				_ = s.PlantSeed(pos, 0)
+			case plot.Crop != nil && plot.Growth.Ready:
+				if _, err := s.Harvest(pos); err != nil {
+					t.Fatalf("Harvest: %v", err)
+				}
+			}
+		}
+		if s.Inventory.Total() == 0 && s.Cash.GTE(cost) {
+			if err := sim.BuySeed(s, OfferStemSeed); err != nil {
+				t.Fatalf("BuySeed: %v", err)
+			}
+		}
+		s.Tick()
+		ticks++
+	}
+
+	if s.Cash.LT(target) {
+		t.Fatalf("an hour of play did not reach %s; the first upgrade is unreachable", target)
+	}
+	mins := float64(ticks) / float64(sim.DefaultTickRate) / 60
+	if mins < 0.5 {
+		t.Errorf("the first upgrade arrives after %.1f minutes; too cheap to be a goal", mins)
+	}
+	if mins > 8 {
+		t.Errorf("the first upgrade takes %.1f minutes; that is a wall, not a goal", mins)
+	}
+	t.Logf("$100 reached after %.1f minutes of play", mins)
 }

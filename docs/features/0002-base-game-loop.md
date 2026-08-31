@@ -24,7 +24,7 @@ The starter crop: a plain upright stalk, no flower, no fruit. It cannot grow int
 
 It is deliberately forgiving. A Stem is always hardy and almost always harvests successfully, so a new player is never punished by dice. It is always an annual, so the plot clears and the loop repeats.
 
-A default Stem matures in about nine seconds.
+**A starter Stem matures in 20 seconds.** Growth Rate varies that a lot: the fastest Stem the gene allows ripens in 10 seconds, the slowest takes 75. Speed is worth breeding for in its own right, not just density.
 
 ## Getting paid
 
@@ -75,6 +75,7 @@ Meeting a strain logs it. The count sits in the header, and the log survives pre
 ## The shop
 
 - **Stem Seed**, $5, always on sale.
+- **Field Extension**, $100 — clears another column of ground, taking the farm from 3x3 to 4x3. The usual first goal, reachable within the opening couple of minutes. Anything already growing keeps growing; the new column arrives as bare soil.
 - **Voidshoot Licence**, $2,500 — a one-off upgrade that puts the Voidshoot Seed on sale at $900.
 
 A rare seed is gated by an upgrade rather than by its own economy, so unlocking one is an ordinary purchase.

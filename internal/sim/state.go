@@ -128,28 +128,50 @@ func grantStarterSeeds(s *GameState) {
 	s.Inventory.Add(o.Kind, o.Genome, StarterSeeds)
 }
 
-// StartingGridSize returns the farm dimensions a fresh run begins with: the
-// base size plus whole extra rows and columns paid for out of the ExtraPlots
-// budget granted by durable unlocks. Growth alternates column then row so the
-// farm stays near-square, and stops at MaxGridW/MaxGridH.
+// StartingGridSize returns the farm dimensions a run is entitled to: the base
+// size plus whatever durable unlocks have widened it by, clamped to the
+// maximum farm.
 func StartingGridSize(s *GameState) (w, h int) {
 	w, h = DefaultGridW, DefaultGridH
-	budget := 0
 	if s != nil {
-		budget = s.Modifiers.ExtraPlots
+		w += s.Modifiers.ExtraColumns
+		h += s.Modifiers.ExtraRows
 	}
-	for {
-		switch {
-		case w <= h && w < MaxGridW && budget >= h:
-			budget -= h
-			w++
-		case h < MaxGridH && budget >= w:
-			budget -= w
-			h++
-		default:
-			return w, h
-		}
+	if w > MaxGridW {
+		w = MaxGridW
 	}
+	if h > MaxGridH {
+		h = MaxGridH
+	}
+	if w < DefaultGridW {
+		w = DefaultGridW
+	}
+	if h < DefaultGridH {
+		h = DefaultGridH
+	}
+	return w, h
+}
+
+// syncFarmSize grows the farm to the size its unlocks entitle it to.
+//
+// It only ever grows. Grid.Resize preserves plots by coordinate when growing,
+// so a farm mid-crop keeps everything standing; shrinking would destroy
+// planted crops, so a farm somehow larger than its entitlement is left alone.
+func syncFarmSize(s *GameState) {
+	if s == nil || s.Grid == nil {
+		return
+	}
+	w, h := StartingGridSize(s)
+	if w <= s.Grid.W && h <= s.Grid.H {
+		return
+	}
+	if w < s.Grid.W {
+		w = s.Grid.W
+	}
+	if h < s.Grid.H {
+		h = s.Grid.H
+	}
+	s.Grid.Resize(w, h)
 }
 
 // NextPlantSeed returns a fresh seed for a newly planted crop and advances the

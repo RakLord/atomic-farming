@@ -1,6 +1,10 @@
 package sim
 
-import "testing"
+import (
+	"testing"
+
+	"atomicfarming/internal/plant"
+)
 
 func TestNewGridAllocatesEveryPlot(t *testing.T) {
 	g := NewGrid(4, 3)
@@ -114,25 +118,82 @@ func TestGridViewHandsOutCopies(t *testing.T) {
 	}
 }
 
-func TestStartingGridSizeSpendsExtraPlotBudget(t *testing.T) {
+func TestStartingGridSizeAddsUnlockedColumnsAndRows(t *testing.T) {
 	tests := []struct {
-		extra int
-		wantW int
-		wantH int
+		cols, rows   int
+		wantW, wantH int
 	}{
-		{extra: 0, wantW: 3, wantH: 3},
-		{extra: 2, wantW: 3, wantH: 3}, // not enough for a whole column
-		{extra: 3, wantW: 4, wantH: 3}, // one column
-		{extra: 7, wantW: 4, wantH: 4}, // column (3) then row (4)
-		{extra: 10000, wantW: MaxGridW, wantH: MaxGridH},
-		{extra: -5, wantW: 3, wantH: 3}, // nonsense budget is inert
+		{0, 0, DefaultGridW, DefaultGridH},
+		{1, 0, DefaultGridW + 1, DefaultGridH},
+		{0, 2, DefaultGridW, DefaultGridH + 2},
+		{3, 3, DefaultGridW + 3, DefaultGridH + 3},
+		// Clamped to the biggest farm the renderer is designed for.
+		{99, 99, MaxGridW, MaxGridH},
+		// Nonsense values must not shrink the farm below its base.
+		{-5, -5, DefaultGridW, DefaultGridH},
 	}
 	for _, tc := range tests {
-		s := NewGameState()
-		s.Modifiers.ExtraPlots = tc.extra
-		w, h := StartingGridSize(s)
-		if w != tc.wantW || h != tc.wantH {
-			t.Errorf("ExtraPlots=%d: got %dx%d, want %dx%d", tc.extra, w, h, tc.wantW, tc.wantH)
+		s := NewGameStateWithSeed(1)
+		s.Modifiers.ExtraColumns, s.Modifiers.ExtraRows = tc.cols, tc.rows
+		if w, h := StartingGridSize(s); w != tc.wantW || h != tc.wantH {
+			t.Errorf("+%dc +%dr: got %dx%d, want %dx%d", tc.cols, tc.rows, w, h, tc.wantW, tc.wantH)
 		}
+	}
+}
+
+// TestSyncFarmSizeGrowsWithoutDisturbingCrops is the failure that would hurt
+// most and stay invisible: widening the farm must not move or drop anything
+// already in the ground.
+func TestSyncFarmSizeGrowsWithoutDisturbingCrops(t *testing.T) {
+	s := NewGameStateWithSeed(1)
+	planted := map[Position]plant.Genome{}
+	for i := range s.Grid.Plots {
+		pos := s.Grid.PositionAt(i)
+		g := plant.RandomGenome(uint64(i) + 1)
+		plot := plantTestCrop(s, pos, g)
+		plot.Growth = Growth{Stage: 2, Progress: 400}
+		planted[pos] = g
+	}
+
+	s.Modifiers.ExtraColumns = 1
+	syncFarmSize(s)
+
+	if s.Grid.W != DefaultGridW+1 || s.Grid.H != DefaultGridH {
+		t.Fatalf("farm is %dx%d, want %dx%d", s.Grid.W, s.Grid.H, DefaultGridW+1, DefaultGridH)
+	}
+	for pos, want := range planted {
+		plot, ok := s.Grid.At(pos)
+		if !ok || plot.Crop == nil {
+			t.Fatalf("the crop at %+v was lost when the farm grew", pos)
+		}
+		if plot.Genome != want {
+			t.Errorf("the crop at %+v changed genome; plots shifted", pos)
+		}
+		if plot.Growth != (Growth{Stage: 2, Progress: 400}) {
+			t.Errorf("the crop at %+v lost its growth: %+v", pos, plot.Growth)
+		}
+	}
+	// The new column is bare ground, not a copy of anything.
+	for y := 0; y < s.Grid.H; y++ {
+		if plot, _ := s.Grid.At(Position{X: DefaultGridW, Y: y}); !plot.IsEmpty() {
+			t.Errorf("the new plot at column %d row %d is not empty", DefaultGridW, y)
+		}
+	}
+}
+
+func TestSyncFarmSizeNeverShrinksTheFarm(t *testing.T) {
+	s := NewGameStateWithSeed(1)
+	s.Grid.Resize(6, 5)
+	plot, _ := s.Grid.At(Position{X: 5, Y: 4})
+	plot.Crop = &testCrop{}
+
+	// No expansion unlocks: entitlement is the base farm, well under 6x5.
+	syncFarmSize(s)
+
+	if s.Grid.W != 6 || s.Grid.H != 5 {
+		t.Fatalf("farm shrank to %dx%d; that would destroy planted crops", s.Grid.W, s.Grid.H)
+	}
+	if got, _ := s.Grid.At(Position{X: 5, Y: 4}); got.Crop == nil {
+		t.Error("the outermost crop was destroyed")
 	}
 }

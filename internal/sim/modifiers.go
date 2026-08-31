@@ -27,10 +27,12 @@ type GlobalModifiers struct {
 	// error. The base rate is deliberately near-never, so this is what makes
 	// deliberate drift possible at all.
 	MutationRateMul bignum.Decimal `json:"mutation_rate_mul"`
-	// ExtraPlots is a budget of free plots granted on top of the base farm
-	// size at the start of every run. Read by StartingGridSize, which spends
-	// it on whole rows and columns so the farm stays rectangular.
-	ExtraPlots int `json:"extra_plots,omitempty"`
+	// ExtraColumns and ExtraRows widen and deepen the farm beyond its base
+	// size. They replaced a plot budget that could not express "one more
+	// column": on a 3x3 farm the first column costs three plots and the second
+	// costs four, so a fixed grant silently wasted the remainder.
+	ExtraColumns int `json:"extra_columns,omitempty"`
+	ExtraRows    int `json:"extra_rows,omitempty"`
 }
 
 // Normalized returns a copy with zero-valued Decimal fields promoted to 1, so
@@ -79,6 +81,9 @@ func rebuildModifiers(s *GameState) {
 		}
 		unlock.Apply(&s.Modifiers)
 	}
+	// Farm size is derived from unlocks too, so it is rebuilt here rather than
+	// at each of the several call sites that would otherwise have to remember.
+	syncFarmSize(s)
 }
 
 // mulModifier folds factor into a multiplicative modifier field, treating an

@@ -6,8 +6,9 @@ import "atomicfarming/internal/bignum"
 // specific unlocks live alongside their crop in internal/sim/crops.
 
 const (
-	UnlockIrradiationI  UnlockID = "irradiation_1"
-	UnlockIrradiationII UnlockID = "irradiation_2"
+	UnlockIrradiationI   UnlockID = "irradiation_1"
+	UnlockIrradiationII  UnlockID = "irradiation_2"
+	UnlockFieldExtension UnlockID = "field_extension"
 )
 
 // IrradiationStepMul is what each irradiation tier multiplies the self-seeding
@@ -20,6 +21,17 @@ const (
 const IrradiationStepMul = "12"
 
 func init() {
+	// The first thing worth saving for. Cheap enough to be a goal within the
+	// opening few minutes rather than a wall.
+	RegisterUnlock(Unlock{
+		ID:          UnlockFieldExtension,
+		Name:        "Field Extension",
+		Description: "Clears another column of ground for planting.",
+		Cost:        bignum.MustParse("100"),
+		Apply: func(m *GlobalModifiers) {
+			m.ExtraColumns++
+		},
+	})
 	RegisterUnlock(Unlock{
 		ID:          UnlockIrradiationI,
 		Name:        "Seed Irradiator",

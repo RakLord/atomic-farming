@@ -19,8 +19,8 @@ func TestNormalizedPromotesZeroDecimalsToIdentity(t *testing.T) {
 			t.Errorf("%s = %s, want 1 — read sites would multiply by zero", name, got)
 		}
 	}
-	if m.ExtraPlots != 0 {
-		t.Errorf("ExtraPlots = %d, want 0 — integer fields are additive", m.ExtraPlots)
+	if m.ExtraColumns != 0 {
+		t.Errorf("ExtraPlots = %d, want 0 — integer fields are additive", m.ExtraColumns)
 	}
 }
 

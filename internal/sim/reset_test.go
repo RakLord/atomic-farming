@@ -88,7 +88,7 @@ func TestApplyLayerResetRetainsDurableProgression(t *testing.T) {
 		ID:   id,
 		Name: "Test Homestead",
 		Apply: func(m *GlobalModifiers) {
-			m.ExtraPlots += 3
+			m.ExtraColumns++
 			m.YieldMul = mulModifier(m.YieldMul, bignum.MustParse("2"))
 		},
 	}
@@ -103,8 +103,8 @@ func TestApplyLayerResetRetainsDurableProgression(t *testing.T) {
 	if !s.Unlocks[id] {
 		t.Fatal("unlock did not survive the reset")
 	}
-	if s.Modifiers.ExtraPlots != 3 {
-		t.Errorf("ExtraPlots = %d, want 3 — modifiers were not rebuilt after reset", s.Modifiers.ExtraPlots)
+	if s.Modifiers.ExtraColumns != 1 {
+		t.Errorf("ExtraPlots = %d, want 3 — modifiers were not rebuilt after reset", s.Modifiers.ExtraColumns)
 	}
 	if s.Grid.W != 4 || s.Grid.H != 3 {
 		t.Errorf("post-reset farm is %dx%d, want 4x3 — the retained plot budget was not spent", s.Grid.W, s.Grid.H)

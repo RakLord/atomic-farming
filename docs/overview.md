@@ -69,7 +69,7 @@ See `docs/adr/0005-crop-registry-and-plot-model.md`.
 
 - Starts **3×3**, designed up to **12×12** (`sim.MaxGridW`/`MaxGridH`).
 - Dimensions are runtime state, not a compile-time constant: `Grid.Resize` is what farm expansion calls. See `docs/adr/0004-dynamic-grid-dimensions.md`.
-- Durable unlocks grant an `ExtraPlots` budget, spent by `StartingGridSize` on whole rows and columns so a post-prestige farm starts larger while staying rectangular.
+- Durable unlocks grant `ExtraColumns` and `ExtraRows`, which `StartingGridSize` adds to the base farm. The farm grows the moment an expansion is bought and never shrinks, so nothing already planted is disturbed.
 
 ## Rendering / resolution
 

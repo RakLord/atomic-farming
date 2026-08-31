@@ -11,7 +11,7 @@ Phase 1 needs a loop: buy a seed, sow it, wait, gather it, get paid, buy another
 
 **1. Growth is integer progress against an integer threshold.**
 
-A plant accumulates `GrowthUnitsPerStage` (1000) of progress per stage, gaining 8 to 50 units a tick depending on its `GrowthRate`. No fractions, so growth replays exactly. A default Stem matures in about 94 ticks — nine seconds.
+A plant accumulates `GrowthUnitsPerStage` (1000) of progress per stage, gaining 1 to 30 units a tick depending on its `GrowthRate`. No fractions, so growth replays exactly. A starter Stem matures in 200 ticks — twenty seconds — with the gene spanning 10 to 75 seconds across the species. The worked derivation lives beside the constants in `internal/sim/growth.go`, because the constants are in units per tick and the number worth tuning is seconds.
 
 `Modifiers.GrowthRateMul` is a `bignum.Decimal`, so it reaches integer growth maths through `modifierPermille`. That is a sanctioned exception to the integer-only rule and is safe for a specific reason: `Decimal.Float64` is a `math.Pow10` table lookup and one IEEE-754 multiply, both bit-identical on every platform, and the scale and truncation after it are exact.
 

@@ -90,7 +90,10 @@ var GeneCatalog = [GeneCount]GeneSpec{
 	GeneSymmetry: {GeneSymmetry, "Symmetry", GroupNoise, ExprAverage, 128},
 
 	// Vigour — declared now, read when Phase 1 grows crops.
-	GeneGrowthRate:    {GeneGrowthRate, "Growth Rate", GroupVigour, ExprAverage, 128},
+	// 106 rather than a neutral 128: Express remaps into the species window,
+	// and the Stem's starts at 22, which would push a 128 up to 139 and mature
+	// the starter seed in 17.6s instead of the intended 20s.
+	GeneGrowthRate:    {GeneGrowthRate, "Growth Rate", GroupVigour, ExprAverage, 106},
 	GeneVitality:      {GeneVitality, "Vitality", GroupVigour, ExprDominant, 200},
 	GeneLifespan:      {GeneLifespan, "Lifespan", GroupVigour, ExprAverage, 128},
 	GeneWaterNeed:     {GeneWaterNeed, "Water Need", GroupVigour, ExprAverage, 128},

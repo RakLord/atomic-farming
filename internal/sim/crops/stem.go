@@ -38,7 +38,9 @@ var stemRanges = plant.RangesFrom(map[plant.GeneID]plant.GeneRange{
 	plant.GeneStemLum:       {Min: 40, Max: 220},
 	plant.GeneLeafSize:      {Min: 60, Max: 200},
 
-	plant.GeneGrowthRate: {Min: 40, Max: 255},
+	// Wide on purpose: 10s at the top of this window, 75s at the bottom, so
+	// Growth Rate is worth breeding for rather than a rounding error.
+	plant.GeneGrowthRate: {Min: 22, Max: 255},
 	// A starter crop the player cannot keep alive is not a starter crop.
 	plant.GeneVitality: {Min: 210, Max: 255},
 

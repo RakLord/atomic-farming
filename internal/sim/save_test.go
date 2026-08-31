@@ -127,8 +127,15 @@ func TestLoadRepairsInvariants(t *testing.T) {
 	if got.TickRate != DefaultTickRate {
 		t.Errorf("TickRate = %d, want %d", got.TickRate, DefaultTickRate)
 	}
-	if len(got.Grid.Plots) != 4 {
-		t.Errorf("len(Plots) = %d, want 4 — truncated grid was not repaired", len(got.Grid.Plots))
+	// The save claims a 2x2 farm holding one plot. Both are repaired: the plot
+	// slice is grown to match the dimensions, and the farm itself is brought up
+	// to the base size, since nothing entitles a save to a smaller one.
+	if got.Grid.W != DefaultGridW || got.Grid.H != DefaultGridH {
+		t.Errorf("farm is %dx%d, want the base %dx%d", got.Grid.W, got.Grid.H, DefaultGridW, DefaultGridH)
+	}
+	if len(got.Grid.Plots) != got.Grid.W*got.Grid.H {
+		t.Errorf("len(Plots) = %d, want %d — the truncated grid was not repaired",
+			len(got.Grid.Plots), got.Grid.W*got.Grid.H)
 	}
 	if got.Unlocks == nil {
 		t.Error("Unlocks is nil after load")
