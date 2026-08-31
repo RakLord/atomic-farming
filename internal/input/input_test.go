@@ -12,8 +12,12 @@ import (
 	"atomicfarming/internal/ui"
 )
 
+// newGame roots the world at a fixed seed. sim.NewGameState draws its seed
+// from the clock, so any test that grows and harvests a plant would otherwise
+// be rolling that plant's ~3% chance of dying or failing to set — a flake that
+// passes locally and fails in CI.
 func newGame() (*sim.GameState, *ui.UIState) {
-	return sim.NewGameState(), ui.NewUIState()
+	return sim.NewGameStateWithSeed(20260901), ui.NewUIState()
 }
 
 func TestHoverTracksAndClears(t *testing.T) {

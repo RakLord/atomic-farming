@@ -60,18 +60,26 @@ type GameState struct {
 // these there would be no way to begin.
 const StarterSeeds = 3
 
-// NewGameState returns the state a brand-new save starts from.
+// NewGameState returns the state a brand-new save starts from, with its world
+// seed drawn from the clock.
+//
+// That draw makes it the one constructor whose result is not reproducible, so
+// any test whose outcome depends on a roll must use NewGameStateWithSeed
+// instead — otherwise it is quietly rolling dice on every run.
 func NewGameState() *GameState {
+	return NewGameStateWithSeed(plant.Hash64(uint64(time.Now().UnixNano())))
+}
+
+// NewGameStateWithSeed returns a brand-new save rooted at a chosen world seed,
+// so every roll it goes on to make is reproducible.
+func NewGameStateWithSeed(worldSeed uint64) *GameState {
 	s := &GameState{
-		Layer:    LayerField,
-		Grid:     NewGrid(DefaultGridW, DefaultGridH),
-		Cash:     bignum.Zero(),
-		Unlocks:  map[UnlockID]bool{},
-		TickRate: DefaultTickRate,
-		// Drawn from the clock so two players do not farm identical plants.
-		// This is the only place the wall clock is read; Tick never does, and
-		// every roll thereafter derives from this value.
-		WorldSeed:         plant.Hash64(uint64(time.Now().UnixNano())),
+		Layer:             LayerField,
+		Grid:              NewGrid(DefaultGridW, DefaultGridH),
+		Cash:              bignum.Zero(),
+		Unlocks:           map[UnlockID]bool{},
+		TickRate:          DefaultTickRate,
+		WorldSeed:         worldSeed,
 		DiscoveredStrains: map[StrainID]bool{},
 	}
 	grantStarterSeeds(s)

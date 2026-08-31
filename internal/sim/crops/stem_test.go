@@ -125,51 +125,85 @@ func TestVoidshootCannotBeReachedByOrdinaryGenomes(t *testing.T) {
 	}
 }
 
+// TestStarterSetupIsPlayable checks the opening of the game across many
+// worlds rather than one.
+//
+// A single run of this would be rolling the starter Stem's harvest chance —
+// about 97%, so it fails roughly one run in thirty-six. That is a fine rate
+// for a game and a terrible one for a test, and it is exactly the kind of flake
+// that passes locally and fails in CI.
 func TestStarterSetupIsPlayable(t *testing.T) {
 	if sim.StarterOffer != OfferStemSeed {
 		t.Errorf("StarterOffer = %q, want the Stem seed", sim.StarterOffer)
 	}
 
-	s := sim.NewGameState()
-	if s.Inventory.Total() != sim.StarterSeeds {
-		t.Fatalf("a new farm starts with %d seeds, want %d", s.Inventory.Total(), sim.StarterSeeds)
-	}
-	if !s.Cash.IsZero() {
-		t.Errorf("a new farm starts with %s cash, want zero", s.Cash)
+	const worlds = 200
+	paid, died, ticksTotal := 0, 0, 0
+
+	for seed := uint64(1); seed <= worlds; seed++ {
+		s := sim.NewGameStateWithSeed(seed)
+		if s.Inventory.Total() != sim.StarterSeeds {
+			t.Fatalf("a new farm starts with %d seeds, want %d", s.Inventory.Total(), sim.StarterSeeds)
+		}
+		if !s.Cash.IsZero() {
+			t.Fatalf("a new farm starts with %s cash, want zero", s.Cash)
+		}
+
+		pos := sim.Position{}
+		if err := s.PlantSeed(pos, 0); err != nil {
+			t.Fatalf("planting a starter seed: %v", err)
+		}
+		ticks, lost := 0, false
+		for i := 0; i < 20000; i++ {
+			s.Tick()
+			ticks++
+			plot, _ := s.Grid.At(pos)
+			if plot.Crop == nil {
+				lost = true
+				break
+			}
+			if plot.Growth.Ready {
+				break
+			}
+		}
+		if lost {
+			died++
+			continue
+		}
+		ticksTotal += ticks
+
+		res, err := s.Harvest(pos)
+		if err != nil {
+			t.Fatalf("harvesting a starter plant: %v", err)
+		}
+		if !res.Success {
+			continue
+		}
+		paid++
+		// A first harvest must cover a meaningful share of the next seed, or
+		// the loop never gets going.
+		if s.Cash.LT(sim.SeedCost(s, OfferStemSeed).DivInt(4)) {
+			t.Fatalf("world %d: a first harvest pays %s against a seed price of %s",
+				seed, s.Cash, sim.SeedCost(s, OfferStemSeed))
+		}
 	}
 
-	// The starter seeds must actually grow into something harvestable, or a
-	// new player is stuck at nothing.
-	pos := sim.Position{}
-	if err := s.PlantSeed(pos, 0); err != nil {
-		t.Fatalf("planting a starter seed: %v", err)
+	// The starter crop is meant to be forgiving, not infallible: losing a
+	// first plant should be a rarity a player shrugs at, not a coin flip.
+	if died > worlds/50 {
+		t.Errorf("%d/%d starter plants died before ripening; the opening is too punishing", died, worlds)
 	}
-	for i := 0; i < 20000; i++ {
-		s.Tick()
-		plot, _ := s.Grid.At(pos)
-		if plot.Crop == nil {
-			t.Fatal("the starter plant died")
-		}
-		if plot.Growth.Ready {
-			break
-		}
+	if paid < worlds*90/100 {
+		t.Errorf("only %d/%d first harvests paid out; the opening is too punishing", paid, worlds)
 	}
-	res, err := s.Harvest(pos)
-	if err != nil {
-		t.Fatalf("harvesting a starter plant: %v", err)
-	}
-	if !res.Success || !s.Cash.GT(sim.NewGameState().Cash) {
-		t.Errorf("the first harvest paid nothing: %+v", res)
-	}
-	// And the first harvest must cover a meaningful share of the next seed.
-	if s.Cash.LT(sim.SeedCost(s, OfferStemSeed).DivInt(4)) {
-		t.Errorf("a first harvest pays %s against a seed price of %s; the loop would not get going",
-			s.Cash, sim.SeedCost(s, OfferStemSeed))
-	}
+	t.Logf("%d/%d first harvests paid, %d plants lost; a starter Stem matures in %d ticks on average",
+		paid, worlds, died, ticksTotal/(worlds-died))
 }
 
 func TestStemGrowsInAReasonableTime(t *testing.T) {
-	s := sim.NewGameState()
+	// Fixed seed: a clock-seeded world would occasionally kill the plant and
+	// turn this timing check into a flake.
+	s := sim.NewGameStateWithSeed(7)
 	pos := sim.Position{}
 	if err := s.PlantSeed(pos, 0); err != nil {
 		t.Fatalf("PlantSeed: %v", err)
@@ -179,6 +213,9 @@ func TestStemGrowsInAReasonableTime(t *testing.T) {
 		s.Tick()
 		ticks++
 		plot, _ := s.Grid.At(pos)
+		if plot.Crop == nil {
+			t.Fatal("the plant died")
+		}
 		if plot.Growth.Ready {
 			break
 		}
