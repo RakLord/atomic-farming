@@ -8,7 +8,7 @@ An incremental/idle farming game built with **Ebitengine** in Go, targeting the 
 
 The game concept, terminology, and phasing live in `docs/overview.md` — **read it before making non-trivial changes**; it is the canonical source of truth for the game model. Architectural decisions live in `docs/adr/`, feature-level detail in `docs/features/`.
 
-The current build is **Phase 0.5**. The pipeline works end to end — tick loop, save round-trip, desktop and WASM builds — and the plant genome and procedural plant generator are in. Plants can be generated, bred, mutated and drawn, but no gameplay exists yet: nothing is planted, grown, harvested or sold.
+The current build is **Phase 1**: the base loop is playable. Buy a Stem seed, sow it, watch it grow, harvest it for cash and seeds, and buy another. Harvested seeds carry the parent genome slightly mutated, so lines drift and named strains can be discovered by playing.
 
 ## Commands
 
@@ -37,7 +37,7 @@ CI (`.github/workflows/deploy.yml`) vets, tests, builds WASM on push to `main`, 
 
 Entry point: `cmd/game/main.go` loads the save (or starts fresh), wires state into a `render.Game`, and runs Ebitengine.
 
-- `internal/sim` — grid, plots, crops, modifiers, layers, resets, tick loop, save format. **No Ebitengine imports.** All game logic lives here.
+- `internal/sim` — grid, plots, crops, growth, harvest, the seed inventory, the shop, named strains, modifiers, layers, resets, tick loop, save format. **No Ebitengine imports.** All game logic lives here.
 - `internal/render` — the `ebiten.Game` implementation. Reads `sim` state; never mutates it outside `Update`'s call to `Tick`. Owns layout geometry, colours, fonts.
 - `internal/input` — maps an already-resolved `sim.Position` to UI intent. No Ebitengine, so it tests headless. Screen-to-plot mapping is `render.cellAt`.
 - `internal/ui` — transient view state (hover, selection) that is never saved.
@@ -58,6 +58,12 @@ Entry point: `cmd/game/main.go` loads the save (or starts fresh), wires state in
 **Adding a crop touches one directory.** Drop a file in `internal/sim/crops/` that registers itself from `init()`. No edits to `tick.go`, `save.go`, or the registry. `CropKind` strings are save identifiers: unique, and never renamed once shipped.
 
 **The grid is runtime-dimensioned.** `Grid.W`/`H` with a flat `Plots` slice, not a fixed array — the farm grows. Render geometry is computed from the current dimensions; `cellAt` must stay the exact inverse of `cellRect`. See `docs/adr/0004-dynamic-grid-dimensions.md`.
+
+**The death roll is once per stage, never once per tick.** A plant lives for hundreds of ticks, so a per-tick roll compounds and even one basis point kills nearly everything before maturity — a rate that reads as harmless and is not. Pinned by `TestDeathIsRolledPerStageNotPerTick`.
+
+**`IdentifyStrain` iterates `StrainCatalogOrder`, never the catalog map.** Go randomises map order, so resolving through the map lets a plant name itself differently between frames.
+
+**A strain must be reachable inside its species' gene ranges.** `Express` remaps into the species window, so a predicate demanding more than a species can express is content nobody can ever grow. `TestEveryPredicateStrainIsReachable` is the guard.
 
 **Gameplay randomness is integer-only and seed-derived.** Every random outcome goes through `plant.Chance`/`plant.Roll` with a persisted seed — never `math/rand`, never a live stream, never a float. A float-derived chance can differ between the desktop and WASM builds and silently desynchronise an offline tick replay. Probabilities are integers in basis points; `Phenotype.Scaled` is the integer accessor. Float accessors (`Unit`, `Lerp`, `UnitFloat`) are for pixels only. See `docs/adr/0010-determinism.md`.
 

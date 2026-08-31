@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"atomicfarming/internal/bignum"
+	"atomicfarming/internal/plant"
 )
 
 // CropKind is a crop's stable on-disk identifier. It is a save-format
@@ -22,6 +23,10 @@ type Crop interface {
 	// Stages is how many growth stages the crop passes through before it is
 	// ready to harvest. Must be at least 1.
 	Stages() int
+	// Ranges bounds every gene for this species. It is what gives a species
+	// its identity: a Stem's archetype genes have a narrow window, an exotic's
+	// a wide one. See docs/adr/0009-plant-genome.md.
+	Ranges() plant.SpeciesRanges
 	// Grow advances the crop by one tick and returns the updated growth state.
 	//
 	// ctx is a read-only view of world state. Implementations must not mutate
@@ -57,6 +62,14 @@ type GrowContext struct {
 	Tick      uint64
 	Modifiers GlobalModifiers
 	Layer     Layer
+	// Phenotype is this plant's expressed genes, already remapped into its
+	// species ranges. It comes from the Plot's derived cache rather than being
+	// re-expressed each tick.
+	Phenotype plant.Phenotype
+	// Seed is this plant's roll seed. Every random outcome for this plant
+	// derives from it, so growth and death replay identically offline.
+	// See docs/adr/0010-determinism.md.
+	Seed uint64
 }
 
 // GridView is the read-only accessor for farm state. Plots are returned by
@@ -74,6 +87,7 @@ func NewTestGrowContext() GrowContext {
 	return GrowContext{
 		Modifiers: GlobalModifiers{}.Normalized(),
 		Layer:     LayerField,
+		Phenotype: plant.ExpressFull(plant.DefaultGenome()),
 	}
 }
 

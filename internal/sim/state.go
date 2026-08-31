@@ -47,7 +47,18 @@ type GameState struct {
 	WorldSeed uint64 `json:"world_seed,omitempty"`
 	// PlantCounter makes each planting's seed distinct. Monotonic within a run.
 	PlantCounter uint64 `json:"plant_counter,omitempty"`
+	// Inventory is the player's seed stock.
+	Inventory Inventory `json:"inventory,omitempty"`
+	// DiscoveredStrains is the collection log: every named strain the player
+	// has grown or bought. A strain's name is derived from its genome and
+	// never stored; this record of having met it is the only real state the
+	// naming system has. See docs/adr/0012-named-strains.md.
+	DiscoveredStrains map[StrainID]bool `json:"discovered_strains,omitempty"`
 }
+
+// StarterSeeds is what a new farm begins with. Cash starts at zero, so without
+// these there would be no way to begin.
+const StarterSeeds = 3
 
 // NewGameState returns the state a brand-new save starts from.
 func NewGameState() *GameState {
@@ -60,10 +71,24 @@ func NewGameState() *GameState {
 		// Drawn from the clock so two players do not farm identical plants.
 		// This is the only place the wall clock is read; Tick never does, and
 		// every roll thereafter derives from this value.
-		WorldSeed: plant.Hash64(uint64(time.Now().UnixNano())),
+		WorldSeed:         plant.Hash64(uint64(time.Now().UnixNano())),
+		DiscoveredStrains: map[StrainID]bool{},
 	}
+	grantStarterSeeds(s)
 	rebuildModifiers(s)
 	return s
+}
+
+// StarterOffer is the shop entry a new farm's starting seeds come from. A crop
+// claims it from init(); until one does, a new farm simply starts empty.
+var StarterOffer SeedOfferID
+
+func grantStarterSeeds(s *GameState) {
+	o, ok := SeedShop[StarterOffer]
+	if !ok {
+		return
+	}
+	s.Inventory.Add(o.Kind, o.Genome, StarterSeeds)
 }
 
 // StartingGridSize returns the farm dimensions a fresh run begins with: the

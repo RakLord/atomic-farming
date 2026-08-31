@@ -146,14 +146,25 @@ func repairState(s *GameState) {
 	if s.WorldSeed == 0 {
 		s.WorldSeed = plant.Hash64(uint64(s.Ticks) + 1)
 	}
+	if s.DiscoveredStrains == nil {
+		s.DiscoveredStrains = map[StrainID]bool{}
+	}
+	s.Inventory.prune()
 	// A crop with no genome predates the genome layer, or came from a
 	// hand-edited save. Give it the catalog default rather than the all-zero
 	// genome, which expresses as a plant with no stem at all.
+	//
+	// Every planted plot then has its phenotype rebuilt: it is a derived cache
+	// that is never persisted, so it is empty until recomputed here.
 	for i := range s.Grid.Plots {
 		plot := &s.Grid.Plots[i]
-		if plot.Crop != nil && plot.Genome.IsZero() {
+		if plot.Crop == nil {
+			continue
+		}
+		if plot.Genome.IsZero() {
 			plot.Genome = plant.DefaultGenome()
 		}
+		plot.Express()
 	}
 	// Unlocks is the source of truth; whatever Modifiers the save carried is
 	// discarded so retuned unlock effects apply on load.

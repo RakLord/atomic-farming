@@ -43,6 +43,22 @@ type Plot struct {
 	// a save reproduces the same outcomes.
 	// See docs/adr/0010-determinism.md.
 	Seed uint64
+	// Phenotype is Genome expressed through the crop's species ranges. It is a
+	// derived cache, stamped on planting and rebuilt on load — re-expressing
+	// 45 genes for every plot on every tick would be pure waste when the
+	// genome never changes. Same rule as GameState.Modifiers: never persisted,
+	// always recomputed from the authoritative value.
+	Phenotype plant.Phenotype `json:"-"`
+}
+
+// Express recomputes the plot's derived phenotype from its genome and crop.
+// Call it anywhere Crop or Genome changes.
+func (p *Plot) Express() {
+	if p.Crop == nil {
+		p.Phenotype = plant.Phenotype{}
+		return
+	}
+	p.Phenotype = plant.Express(p.Genome, p.Crop.Ranges())
 }
 
 // IsEmpty reports whether the plot has nothing planted in it.
@@ -84,6 +100,18 @@ func (g *Grid) At(p Position) (*Plot, bool) {
 	}
 	return &g.Plots[i], true
 }
+
+// positionOf is the coordinate of the plot at slice index i.
+func (g *Grid) positionOf(i int) Position {
+	if g == nil || g.W <= 0 {
+		return Position{}
+	}
+	return Position{X: i % g.W, Y: i / g.W}
+}
+
+// PositionAt is the coordinate of the plot at slice index i, for callers that
+// iterate the farm by index.
+func (g *Grid) PositionAt(i int) Position { return g.positionOf(i) }
 
 // Resize regrows the farm to w×h, preserving every plot that still falls
 // inside the new bounds at its existing coordinate. Plots outside the new

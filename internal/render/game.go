@@ -4,7 +4,6 @@
 package render
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -57,6 +56,7 @@ func (g *Game) Update() error {
 	// advances separately and never touches the simulation.
 	g.state.Tick()
 	g.lab.Tick()
+	g.uiState.TickNotice()
 
 	g.sinceAutosave++
 	if g.sinceAutosave >= autosaveIntervalTicks {
@@ -93,12 +93,22 @@ func (g *Game) handleInput() {
 	}
 
 	mx, my := ebiten.CursorPosition()
-	pos, ok := cellAt(g.state.Grid, mx, my)
-	input.Hover(g.state, g.uiState, pos, ok)
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		input.SelectPlot(g.state, g.uiState, pos, ok)
+	pos, onFarm := cellAt(g.state.Grid, mx, my)
+	input.Hover(g.state, g.uiState, pos, onFarm)
+
+	if !inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		return
 	}
+	if mx >= panelX {
+		g.handlePanelClick(mx, my)
+		return
+	}
+	input.ClickPlot(g.state, g.uiState, pos, onFarm)
 }
+
+func (g *Game) buySeed(id sim.SeedOfferID) { input.BuySeed(g.state, g.uiState, id) }
+func (g *Game) buyUnlock(id sim.UnlockID)  { input.BuyUnlock(g.state, g.uiState, id) }
+func (g *Game) selectSeed(index int)       { input.SelectSeed(g.state, g.uiState, index) }
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(colorBG)
@@ -126,7 +136,8 @@ func (g *Game) drawHeader(dst *ebiten.Image) {
 		drawTextRight(dst, "SAVE FAILING", fontBody, screenW-20, 17, colorWarning)
 		return
 	}
-	drawTextRight(dst, fmt.Sprintf("tick %d", g.state.Ticks), fontBody, screenW-20, 17, colorTextMuted)
+	drawTextRight(dst, plural(g.state.DiscoveredCount(), "strain", "strains")+" found",
+		fontBody, screenW-20, 17, colorTextMuted)
 }
 
 func (g *Game) drawFarm(dst *ebiten.Image) {
@@ -144,6 +155,7 @@ func (g *Game) drawFarm(dst *ebiten.Image) {
 
 func (g *Game) drawPlot(dst *ebiten.Image, p sim.Position, cell int) {
 	x, y, w, h := cellRect(g.state.Grid, p.X, p.Y)
+	plot, _ := g.state.Grid.At(p)
 
 	soil := colorSoil
 	if g.uiState.IsHovered(p) {
@@ -151,14 +163,22 @@ func (g *Game) drawPlot(dst *ebiten.Image, p sim.Position, cell int) {
 	}
 	fillRect(dst, x, y, w, h, soil)
 
-	// Furrows: two darker bands so bare soil reads as tilled rather than as a
-	// flat swatch. Cheap stand-in until plot art exists.
-	furrow := h / 3
-	for i := 1; i <= 2; i++ {
-		fillRect(dst, x+4, y+furrow*i-1, w-8, 2, colorSoilEdge)
+	if plot != nil && plot.Crop == nil {
+		// Furrows: two darker bands so bare soil reads as tilled rather than
+		// as a flat swatch. They are hidden once something is growing.
+		furrow := h / 3
+		for i := 1; i <= 2; i++ {
+			fillRect(dst, x+4, y+furrow*i-1, w-8, 2, colorSoilEdge)
+		}
+	} else if plot != nil {
+		maturity := plot.Growth.Maturity(plot.Crop.Stages())
+		g.sprites.DrawPlant(dst, plot.Phenotype, maturity, x, y, w, h)
 	}
 
 	strokeRect(dst, x, y, w, h, 1, colorSoilEdge)
+	if plot != nil && plot.Growth.Ready {
+		strokeRect(dst, x+1, y+1, w-2, h-2, 2, colorReady)
+	}
 	if g.uiState.IsSelected(p) {
 		strokeRect(dst, x, y, w, h, 3, colorPlotPick)
 	}

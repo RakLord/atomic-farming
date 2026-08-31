@@ -3,7 +3,13 @@
 // it, so gameplay stays reproducible from GameState alone.
 package ui
 
-import "atomicfarming/internal/sim"
+import (
+	"atomicfarming/internal/plant"
+	"atomicfarming/internal/sim"
+)
+
+// NoticeLifetimeTicks is how long an action message stays on screen.
+const NoticeLifetimeTicks = 40
 
 // UIState is the player's transient view state.
 type UIState struct {
@@ -11,9 +17,67 @@ type UIState struct {
 	HasHover     bool
 	Selected     sim.Position
 	HasSelection bool
+
+	// The seed queued for planting, held by identity rather than by inventory
+	// index: stacks shift as seeds are spent, and an index would silently come
+	// to mean a different seed.
+	SeedKind   sim.CropKind
+	SeedGenome plant.Genome
+	HasSeed    bool
+
+	// Notice is the last action's result, shown briefly.
+	Notice      string
+	noticeTicks int
 }
 
 func NewUIState() *UIState { return &UIState{} }
+
+// SelectSeed queues a seed for planting.
+func (u *UIState) SelectSeed(stack sim.SeedStack) {
+	if u.HasSeed && u.SeedKind == stack.Kind && u.SeedGenome == stack.Genome {
+		u.ClearSeed()
+		return
+	}
+	u.SeedKind, u.SeedGenome, u.HasSeed = stack.Kind, stack.Genome, true
+}
+
+func (u *UIState) ClearSeed() {
+	u.SeedKind, u.SeedGenome, u.HasSeed = "", plant.Genome{}, false
+}
+
+// IsSeedSelected reports whether stack is the queued seed.
+func (u *UIState) IsSeedSelected(stack sim.SeedStack) bool {
+	return u.HasSeed && u.SeedKind == stack.Kind && u.SeedGenome == stack.Genome
+}
+
+// SeedIndex resolves the queued seed to its current inventory position,
+// returning -1 when it is no longer held.
+func (u *UIState) SeedIndex(inv *sim.Inventory) int {
+	if !u.HasSeed || inv == nil {
+		return -1
+	}
+	for i, stack := range inv.Stacks {
+		if stack.Kind == u.SeedKind && stack.Genome == u.SeedGenome {
+			return i
+		}
+	}
+	return -1
+}
+
+// Notify shows a message for a short while.
+func (u *UIState) Notify(msg string) {
+	u.Notice, u.noticeTicks = msg, NoticeLifetimeTicks
+}
+
+// TickNotice ages the current message out. View state only.
+func (u *UIState) TickNotice() {
+	if u.noticeTicks > 0 {
+		u.noticeTicks--
+		if u.noticeTicks == 0 {
+			u.Notice = ""
+		}
+	}
+}
 
 // SetHover marks p as the plot under the cursor.
 func (u *UIState) SetHover(p sim.Position) {

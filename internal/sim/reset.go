@@ -34,11 +34,12 @@ type ResetRule struct {
 // settings, durable cross-prestige progression, derived caches, and
 // persistence bookkeeping. Everything else must be claimed by a rule.
 var resetExemptFields = map[string]string{
-	"Layer":        "the rung itself; changed by ascension, not by a reset",
-	"TickRate":     "player setting, not run state",
-	"Unlocks":      "durable progression; surviving prestige is the point",
-	"Modifiers":    "derived cache, not persisted; rebuilt from Unlocks at the end of every reset",
-	"LastSaveUnix": "persistence bookkeeping, stamped by Save",
+	"Layer":             "the rung itself; changed by ascension, not by a reset",
+	"TickRate":          "player setting, not run state",
+	"Unlocks":           "durable progression; surviving prestige is the point",
+	"DiscoveredStrains": "a collection log; a collection you lose on prestige is not a collection",
+	"Modifiers":         "derived cache, not persisted; rebuilt from Unlocks at the end of every reset",
+	"LastSaveUnix":      "persistence bookkeeping, stamped by Save",
 }
 
 var (
@@ -123,6 +124,17 @@ func init() {
 			// itself stays deterministic and replayable.
 			s.WorldSeed = plant.Hash64(s.WorldSeed)
 			s.PlantCounter = 0
+		},
+	})
+	RegisterResetRule(ResetRule{
+		ID:     "field_inventory",
+		Layer:  LayerField,
+		Fields: []string{"Inventory"},
+		Reset: func(s *GameState) {
+			// Seeds are run state. A fresh run starts from the same handful
+			// everyone begins with, whatever was in the barn before.
+			s.Inventory = Inventory{}
+			grantStarterSeeds(s)
 		},
 	})
 	RegisterResetRule(ResetRule{

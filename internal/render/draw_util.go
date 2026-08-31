@@ -35,3 +35,9 @@ func drawTextCentered(dst *ebiten.Image, s string, face text.Face, cx, y int, c 
 	w, _ := text.Measure(s, face, 0)
 	drawText(dst, s, face, cx-int(w)/2, y, c)
 }
+
+// textWidth measures a string in logical pixels.
+func textWidth(s string, face text.Face) (w, h int) {
+	fw, fh := text.Measure(s, face, 0)
+	return int(fw), int(fh)
+}

@@ -158,3 +158,16 @@ func (p Phenotype) FlowerArchetype() FlowerArchetype {
 func (p Phenotype) FruitArchetype() FruitArchetype {
 	return FruitArchetype(p.Choice(GeneFruitArchetype, int(FruitArchetypeCount)))
 }
+
+// RangesFrom returns FullRange with the named genes overridden. Species
+// definitions use it so they only have to state the genes they actually
+// constrain.
+func RangesFrom(overrides map[GeneID]GeneRange) SpeciesRanges {
+	r := FullRange()
+	for id, rng := range overrides {
+		if id.Valid() {
+			r[id] = rng
+		}
+	}
+	return r
+}

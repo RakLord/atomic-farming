@@ -28,6 +28,9 @@ Genre: incremental / idle. Platform: browser (Ebitengine → WASM → GitHub Pag
 | Phenotype | The expressed genome — what the plant actually shows, after species ranges are applied. |
 | Strain | A genome, named by its short fingerprint (`4F2A-91BC`). |
 | Density | The gene measuring mass per unit of produce. The stat the whole game climbs toward. |
+| Seed stack | A quantity of seeds sharing one species and one exact genome. |
+| Named strain | A plant recognised by name, either by a trait predicate or by an exact genome signature. |
+| Discovery | A named strain the player has met. Logged permanently, and survives prestige. |
 
 Two words are **banned** in code and UI because they are ambiguous:
 
@@ -86,9 +89,9 @@ See `docs/adr/0005-crop-registry-and-plot-model.md`.
 ## Scope and phasing
 
 - **Phase 0 — scaffold.** Module, packages, CI, WASM, save round-trip, tick loop, and the crop / modifier / reset seams.
-- **Phase 0.5 — genome and generator (this build).** The diploid genome, expression, breeding and mutation, deterministic rolls, the procedural plant generator, and the genetics lab. Plants can be generated, bred and drawn; none are planted yet.
-- **Phase 1 — the core loop.** Seeds, planting, growth advancement, harvest, and selling.
-- **Phase 2 — shop and expansion.** Seed catalog, the unlock catalog, and buying plots.
+- **Phase 0.5 — genome and generator.** The diploid genome, expression, breeding and mutation, deterministic rolls, the procedural plant generator, and the genetics lab.
+- **Phase 1 — the base loop (this build).** Seeds, the Stem crop, growth and death in the tick loop, harvest and cash, the shop, and named strains with a discovery log. See `docs/features/0002-base-game-loop.md`.
+- **Phase 2 — expansion.** Buying plots, more crops, and a deeper upgrade catalog.
 - **Phase 3 — automation.** Sprinklers, auto-harvesters, and offline progress.
 - **Phase 4 — breeding and unlocks.** Cross-breeding produce into denser crops.
 - **Phase 5 — prestige.** The collapse event, the second layer, and persistency-over-prestige upgrades.
