@@ -120,6 +120,14 @@ func (g *Game) clickSeedGroup(group sim.SeedGroup) {
 	input.ClickSeedGroup(g.state, g.uiState, group)
 }
 
+func (g *Game) openSeedIndex(kind sim.CropKind) {
+	input.OpenSeedIndex(g.state, g.uiState, kind)
+}
+
+func (g *Game) toggleSeedAutoSelect(kind sim.CropKind) {
+	input.ToggleSeedAutoSelect(g.state, g.uiState, kind)
+}
+
 // handleSeedIndexInput drives the seed picker. It runs instead of farm input
 // while the index is open, so a click meant for one of its buttons cannot also
 // sow the plot behind it.

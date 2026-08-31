@@ -36,6 +36,7 @@ type ResetRule struct {
 var resetExemptFields = map[string]string{
 	"Layer":             "the rung itself; changed by ascension, not by a reset",
 	"TickRate":          "player setting, not run state",
+	"SeedAutoSelect":    "an interface preference; resetting it every prestige would only be annoying",
 	"Unlocks":           "durable progression; surviving prestige is the point",
 	"DiscoveredStrains": "a collection log; a collection you lose on prestige is not a collection",
 	"Modifiers":         "derived cache, not persisted; rebuilt from Unlocks at the end of every reset",

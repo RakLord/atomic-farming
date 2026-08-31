@@ -92,20 +92,45 @@ func harvestAt(s *sim.GameState, u *ui.UIState, p sim.Position) {
 	}
 }
 
-// ClickSeedGroup queues a group's default line, or opens the index when there
-// is more than one line to choose between.
+// ClickSeedGroup queues a group's bulk line, or opens the picker when the
+// player has turned auto-pick off for that species.
 //
-// The common case — sow a stem, any stem — must stay a single click, so a
-// group with one line never makes the player open a picker to confirm it.
+// Sowing is the thing you do constantly, so it must stay one click. Opening a
+// picker every time there happened to be more than one line was the wrong
+// default; the picker is now reached deliberately, through the row's own
+// button.
 func ClickSeedGroup(s *sim.GameState, u *ui.UIState, g sim.SeedGroup) {
 	if s == nil || u == nil {
 		return
 	}
-	if len(g.Stacks) <= 1 {
+	if len(g.Stacks) <= 1 || s.AutoSelectSeeds(g.Kind) {
 		SelectSeed(s, u, g.DefaultStack(&s.Inventory))
 		return
 	}
 	u.OpenSeedIndex(g.Kind)
+}
+
+// OpenSeedIndex shows the picker for a species. This is what the row's
+// inventory button does, so the picker is always one click away regardless of
+// the auto-pick setting.
+func OpenSeedIndex(s *sim.GameState, u *ui.UIState, kind sim.CropKind) {
+	if s == nil || u == nil || len(s.Inventory.StacksOfKind(kind)) == 0 {
+		return
+	}
+	u.OpenSeedIndex(kind)
+}
+
+// ToggleSeedAutoSelect flips whether a species sows its bulk line on a click.
+func ToggleSeedAutoSelect(s *sim.GameState, u *ui.UIState, kind sim.CropKind) {
+	if s == nil || u == nil {
+		return
+	}
+	name := sim.CropDisplayName(kind)
+	if s.ToggleAutoSelectSeeds(kind) {
+		u.Notify("Auto-pick on — " + name + " rows sow your bulk line")
+		return
+	}
+	u.Notify("Auto-pick off — " + name + " rows open the seed index")
 }
 
 // DiscardSeed bins an entire line.

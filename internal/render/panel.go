@@ -2,6 +2,7 @@ package render
 
 import (
 	"fmt"
+	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
 
@@ -13,10 +14,13 @@ import (
 // both the draw and the click paths, so the two cannot drift apart — a button
 // that draws in one place and responds in another is a nasty class of bug.
 const (
-	panelPadX    = 22
-	panelInnerW  = panelW - 2*panelPadX
-	offerRowH    = 40
-	seedRowH     = 26
+	panelPadX   = 22
+	panelInnerW = panelW - 2*panelPadX
+	offerRowH   = 40
+	seedRowH    = 30
+	// Row buttons: the seed index, and the auto-pick toggle.
+	seedBtnSize  = 20
+	seedBtnGap   = 4
 	sectionGap   = 14
 	maxSeedRows  = 7
 	noticeHeight = 26
@@ -40,7 +44,12 @@ type unlockRow struct {
 
 type seedRow struct {
 	rect  rect
-	group int // index into panelLayout.groups
+	index rect // opens the seed picker
+	auto  rect // toggles auto-pick for this species
+	group int  // index into panelLayout.groups
+	// buttons is false for a group with a single line, where a picker and a
+	// pick-for-me toggle would both be meaningless.
+	buttons bool
 }
 
 type panelLayout struct {
@@ -98,7 +107,17 @@ func (g *Game) panelLayout() panelLayout {
 			l.hidden = len(l.groups) - len(l.seeds)
 			break
 		}
-		l.seeds = append(l.seeds, seedRow{rect{x, y, panelInnerW, seedRowH - 3}, i})
+		r := rect{x, y, panelInnerW, seedRowH - 4}
+		btnY := r.y + (r.h-seedBtnSize)/2
+		autoX := r.x + r.w - 6 - seedBtnSize
+		indexX := autoX - seedBtnGap - seedBtnSize
+		l.seeds = append(l.seeds, seedRow{
+			rect:    r,
+			index:   rect{indexX, btnY, seedBtnSize, seedBtnSize},
+			auto:    rect{autoX, btnY, seedBtnSize, seedBtnSize},
+			group:   i,
+			buttons: len(l.groups[i].Stacks) > 1,
+		})
 		y += seedRowH
 	}
 
@@ -123,8 +142,21 @@ func (g *Game) handlePanelClick(mx, my int) {
 		}
 	}
 	for _, row := range l.seeds {
+		group := l.groups[row.group]
+		// Buttons are tested before the row body, or a click on one would also
+		// fall through and queue a seed.
+		if row.buttons {
+			switch {
+			case row.index.contains(mx, my):
+				g.openSeedIndex(group.Kind)
+				return
+			case row.auto.contains(mx, my):
+				g.toggleSeedAutoSelect(group.Kind)
+				return
+			}
+		}
 		if row.rect.contains(mx, my) {
-			g.clickSeedGroup(l.groups[row.group])
+			g.clickSeedGroup(group)
 			return
 		}
 	}
@@ -160,8 +192,10 @@ func (g *Game) drawPanel(dst *ebiten.Image) {
 		drawText(dst, "None — buy one above", fontSmall, x, l.seedsY+24, colorTextMuted)
 	}
 	for _, row := range l.seeds {
-		g.drawSeedRow(dst, l.groups[row.group], row.rect)
+		g.drawSeedRow(dst, l.groups[row.group], row)
 	}
+	// Tooltips last, so they sit over the rows beneath them.
+	g.drawSeedRowTooltip(dst, l)
 	if l.hidden > 0 {
 		drawTextRight(dst, fmt.Sprintf("+%d more", l.hidden), fontSmall,
 			panelX+panelW-panelPadX, l.seedsY, colorTextMuted)
@@ -193,7 +227,8 @@ func (g *Game) drawBuyRow(dst *ebiten.Image, r rect, name, desc string, cost big
 	drawTextRight(dst, price, fontBody, r.x+r.w-10, r.y+11, priceColor)
 }
 
-func (g *Game) drawSeedRow(dst *ebiten.Image, group sim.SeedGroup, r rect) {
+func (g *Game) drawSeedRow(dst *ebiten.Image, group sim.SeedGroup, row seedRow) {
+	r := row.rect
 	selected := false
 	for _, i := range group.Stacks {
 		if i < len(g.state.Inventory.Stacks) && g.uiState.IsSeedSelected(g.state.Inventory.Stacks[i]) {
@@ -212,17 +247,105 @@ func (g *Game) drawSeedRow(dst *ebiten.Image, group sim.SeedGroup, r rect) {
 	if group.Named {
 		label = rarityColor(group.Strain.Rarity)
 	}
-	drawText(dst, group.Name, fontBody, r.x+10, r.y+4, label)
+	drawText(dst, group.Name, fontBody, r.x+10, r.y+6, label)
 
-	// More than one line behind a row means clicking it opens the index, so
-	// say so rather than letting the extra click be a surprise.
 	if len(group.Stacks) > 1 {
 		w, _ := textWidth(group.Name, fontBody)
 		drawText(dst, fmt.Sprintf("%d lines", len(group.Stacks)), fontSmall,
-			r.x+18+w, r.y+6, colorTextMuted)
+			r.x+18+w, r.y+8, colorTextMuted)
 	}
-	drawTextRight(dst, fmt.Sprintf("x%d", group.Count), fontBody,
-		r.x+r.w-10, r.y+4, colorTextMuted)
+
+	countRight := r.x + r.w - 10
+	if row.buttons {
+		countRight = row.index.x - 10
+		auto := g.state.AutoSelectSeeds(group.Kind)
+		mx, my := ebiten.CursorPosition()
+
+		drawIconButton(dst, row.index, false, row.index.contains(mx, my))
+		drawListIcon(dst, row.index, colorText)
+
+		drawIconButton(dst, row.auto, auto, row.auto.contains(mx, my))
+		drawAutoIcon(dst, row.auto, auto)
+	}
+	drawTextRight(dst, fmt.Sprintf("x%d", group.Count), fontBody, countRight, r.y+6, colorTextMuted)
+}
+
+// seedRowTooltip is the label for whichever row button sits under (mx, my).
+//
+// The decision is split from the drawing so it can be tested: a cursor cannot
+// be moved in a headless test, and a tooltip that names the wrong button — or
+// a button whose hit box has drifted from where it is drawn — would otherwise
+// only be caught by someone noticing.
+func (g *Game) seedRowTooltip(l panelLayout, mx, my int) (label string, anchor rect, ok bool) {
+	for _, row := range l.seeds {
+		if !row.buttons {
+			continue
+		}
+		switch {
+		case row.index.contains(mx, my):
+			return "See every line of this crop", row.index, true
+		case row.auto.contains(mx, my):
+			if g.state.AutoSelectSeeds(l.groups[row.group].Kind) {
+				return "Auto-pick on — click to choose each time", row.auto, true
+			}
+			return "Auto-pick off — click to always sow your bulk line", row.auto, true
+		}
+	}
+	return "", rect{}, false
+}
+
+// drawSeedRowTooltip labels whichever row button the cursor is over. Two
+// unlabelled icons are exactly the kind of thing a player should not have to
+// click to find out about.
+func (g *Game) drawSeedRowTooltip(dst *ebiten.Image, l panelLayout) {
+	mx, my := ebiten.CursorPosition()
+	label, anchor, ok := g.seedRowTooltip(l, mx, my)
+	if !ok {
+		return
+	}
+
+	w, _ := textWidth(label, fontSmall)
+	box := rect{anchor.x + anchor.w - w - 16, anchor.y - 24, w + 16, 20}
+	if box.x < panelX+4 {
+		box.x = panelX + 4
+	}
+	fillRect(dst, box.x, box.y, box.w, box.h, colorTooltip)
+	strokeRect(dst, box.x, box.y, box.w, box.h, 1, colorDivider)
+	drawText(dst, label, fontSmall, box.x+8, box.y+4, colorText)
+}
+
+func drawIconButton(dst *ebiten.Image, r rect, active, hovered bool) {
+	bg := colorRowBG
+	if active {
+		bg = colorToggleOn
+	}
+	fillRect(dst, r.x, r.y, r.w, r.h, bg)
+	edge := colorDivider
+	if hovered {
+		edge = colorPlotPick
+	}
+	strokeRect(dst, r.x, r.y, r.w, r.h, 1, edge)
+}
+
+// drawListIcon is the seed index: a bulleted list of the lines you hold.
+func drawListIcon(dst *ebiten.Image, r rect, c color.Color) {
+	for i := 0; i < 3; i++ {
+		y := r.y + 5 + i*5
+		fillRect(dst, r.x+4, y, 2, 2, c)
+		fillRect(dst, r.x+8, y, r.w-13, 2, c)
+	}
+}
+
+// drawAutoIcon is the auto-pick toggle: a tick, lit when the row sows without
+// asking.
+func drawAutoIcon(dst *ebiten.Image, r rect, on bool) {
+	c := colorIconOff
+	if on {
+		c = colorCash
+	}
+	cx, cy := r.x+r.w/2, r.y+r.h/2
+	strokeLine(dst, cx-5, cy, cx-2, cy+4, 2, c)
+	strokeLine(dst, cx-2, cy+4, cx+5, cy-4, 2, c)
 }
 
 func (g *Game) drawPlotDetail(dst *ebiten.Image, y int) {

@@ -49,6 +49,12 @@ type GameState struct {
 	PlantCounter uint64 `json:"plant_counter,omitempty"`
 	// Inventory is the player's seed stock.
 	Inventory Inventory `json:"inventory,omitempty"`
+	// SeedAutoSelect records, per species, whether clicking its seed row sows
+	// the bulk line straight away instead of opening the picker.
+	//
+	// Absent means on. Needing the picker on every single sowing is the worse
+	// default by far, so the picker is opt-in.
+	SeedAutoSelect map[CropKind]bool `json:"seed_auto_select,omitempty"`
 	// DiscoveredStrains is the collection log: every named strain the player
 	// has grown or bought. A strain's name is derived from its genome and
 	// never stored; this record of having met it is the only real state the
@@ -85,6 +91,29 @@ func NewGameStateWithSeed(worldSeed uint64) *GameState {
 	grantStarterSeeds(s)
 	rebuildModifiers(s)
 	return s
+}
+
+// AutoSelectSeeds reports whether a species sows its bulk line on a row click
+// rather than opening the seed picker.
+func (s *GameState) AutoSelectSeeds(kind CropKind) bool {
+	if s == nil {
+		return true
+	}
+	on, set := s.SeedAutoSelect[kind]
+	return !set || on
+}
+
+// ToggleAutoSelectSeeds flips the preference and returns its new value.
+func (s *GameState) ToggleAutoSelectSeeds(kind CropKind) bool {
+	if s == nil {
+		return true
+	}
+	if s.SeedAutoSelect == nil {
+		s.SeedAutoSelect = map[CropKind]bool{}
+	}
+	next := !s.AutoSelectSeeds(kind)
+	s.SeedAutoSelect[kind] = next
+	return next
 }
 
 // StarterOffer is the shop entry a new farm's starting seeds come from. A crop

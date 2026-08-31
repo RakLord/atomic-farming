@@ -48,7 +48,12 @@ To make a line move you buy into it. The **Seed Irradiator** makes mutations twe
 
 Seeds are listed one row per species — `Stem  7 lines  x24` — so ordinary drift never fills the panel. **Named strains get their own row**, in their rarity colour, because those are the ones worth picking out.
 
-Clicking a species with a single line sows it. Clicking one with several opens the **seed index**: every line you hold, drawn as the plant it grows into, with its Density, Growth and Yield, and buttons to sow it or discard it. Discarding takes the whole line.
+Clicking a species row sows your **bulk line** — the one you hold most of — so sowing a field is one click per plot and never stops to ask which near-identical seed you meant.
+
+A row holding more than one line carries two buttons:
+
+- **The list icon** opens the **seed index**: every line you hold, drawn as the plant it grows into, with its Density, Growth and Yield, and buttons to sow it or discard it. Discarding takes the whole line.
+- **The tick** toggles auto-pick. Lit, the row sows your bulk line. Unlit, clicking the row opens the index instead, for when you are working through several lines deliberately. The setting is remembered per crop.
 
 ## Named strains
 

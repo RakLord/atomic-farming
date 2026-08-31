@@ -170,7 +170,10 @@ func TestClickingASingleLineGroupSowsItWithoutAPicker(t *testing.T) {
 	}
 }
 
-func TestClickingAMultiLineGroupOpensTheIndex(t *testing.T) {
+// TestAutoPickSowsWithoutOpeningThePicker covers the default: sowing is the
+// action you take constantly, so a row click must never make you confirm which
+// of your near-identical lines you meant.
+func TestAutoPickSowsWithoutOpeningThePicker(t *testing.T) {
 	s, u := newGame()
 	s.Inventory.Add(crops.KindStem, plant.RandomGenome(41), 2)
 	s.Inventory.Add(crops.KindStem, plant.RandomGenome(42), 1)
@@ -181,11 +184,57 @@ func TestClickingAMultiLineGroupOpensTheIndex(t *testing.T) {
 	}
 	ClickSeedGroup(s, u, groups[0])
 
-	if !u.SeedIndexOpen {
-		t.Fatal("a group with several lines did not open the picker")
+	if u.SeedIndexOpen {
+		t.Error("auto-pick is on by default, so a row click should not open the picker")
 	}
-	if u.SeedIndexKind != crops.KindStem {
-		t.Errorf("the picker opened on %q, want the stem", u.SeedIndexKind)
+	if !u.HasSeed {
+		t.Fatal("the row click did not queue a seed")
+	}
+	// It queues the bulk line, not whichever happened to be first.
+	if idx := u.SeedIndex(&s.Inventory); idx < 0 || s.Inventory.Stacks[idx].Count != 3 {
+		t.Error("auto-pick did not queue the most numerous line")
+	}
+}
+
+func TestTurningAutoPickOffRestoresThePicker(t *testing.T) {
+	s, u := newGame()
+	s.Inventory.Add(crops.KindStem, plant.RandomGenome(41), 2)
+	s.Inventory.Add(crops.KindStem, plant.RandomGenome(42), 1)
+
+	ToggleSeedAutoSelect(s, u, crops.KindStem)
+	if s.AutoSelectSeeds(crops.KindStem) {
+		t.Fatal("the toggle did not turn auto-pick off")
+	}
+
+	ClickSeedGroup(s, u, s.GroupSeeds()[0])
+	if !u.SeedIndexOpen {
+		t.Error("with auto-pick off, a row click should open the picker")
+	}
+
+	ToggleSeedAutoSelect(s, u, crops.KindStem)
+	if !s.AutoSelectSeeds(crops.KindStem) {
+		t.Error("the toggle did not turn auto-pick back on")
+	}
+}
+
+// TestTheIndexButtonAlwaysOpensThePicker: auto-pick removes the picker from
+// the click path, so there must still be a deliberate way to reach it.
+func TestTheIndexButtonAlwaysOpensThePicker(t *testing.T) {
+	s, u := newGame()
+	s.Inventory.Add(crops.KindStem, plant.RandomGenome(41), 2)
+
+	if !s.AutoSelectSeeds(crops.KindStem) {
+		t.Fatal("auto-pick should default on")
+	}
+	OpenSeedIndex(s, u, crops.KindStem)
+	if !u.SeedIndexOpen {
+		t.Error("the index button did not open the picker")
+	}
+
+	u.CloseSeedIndex()
+	OpenSeedIndex(s, u, "no_such_species")
+	if u.SeedIndexOpen {
+		t.Error("the picker opened on a species holding no seeds")
 	}
 }
 

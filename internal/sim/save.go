@@ -149,6 +149,9 @@ func repairState(s *GameState) {
 	if s.DiscoveredStrains == nil {
 		s.DiscoveredStrains = map[StrainID]bool{}
 	}
+	if s.SeedAutoSelect == nil {
+		s.SeedAutoSelect = map[CropKind]bool{}
+	}
 	s.Inventory.prune()
 	// A crop with no genome predates the genome layer, or came from a
 	// hand-edited save. Give it the catalog default rather than the all-zero

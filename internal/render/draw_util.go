@@ -41,3 +41,8 @@ func textWidth(s string, face text.Face) (w, h int) {
 	fw, fh := text.Measure(s, face, 0)
 	return int(fw), int(fh)
 }
+
+// strokeLine draws a line between two logical points.
+func strokeLine(dst *ebiten.Image, x0, y0, x1, y1 int, width float32, c color.Color) {
+	vector.StrokeLine(dst, float32(x0), float32(y0), float32(x1), float32(y1), width, c, true)
+}

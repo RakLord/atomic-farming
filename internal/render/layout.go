@@ -55,6 +55,11 @@ var (
 	colorRowBG       = color.RGBA{0x18, 0x22, 0x1a, 0xff}
 	colorRowBuyable  = color.RGBA{0x1f, 0x30, 0x22, 0xff}
 	colorRowSelected = color.RGBA{0x2e, 0x44, 0x30, 0xff}
+	colorToggleOn    = color.RGBA{0x27, 0x42, 0x2b, 0xff}
+	// Deliberately dim: an off toggle that merely looks slightly different
+	// from an on one is not a toggle anybody can read at a glance.
+	colorIconOff = color.RGBA{0x4a, 0x55, 0x49, 0xff}
+	colorTooltip = color.RGBA{0x08, 0x0d, 0x09, 0xf2}
 )
 
 // rarityColors tint a strain's name so a find reads as a find.
