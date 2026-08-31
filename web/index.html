@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Atomic Farming</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0c120c; color: #eff3e8; font-family: system-ui, sans-serif; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { touch-action: none; }
+  #loader { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #0c120c; font-size: 14px; letter-spacing: 0.3em; text-transform: uppercase; color: #8ed96a; }
+  #loader.hidden { display: none; }
+  #loader.failed { color: #e07a4a; }
+</style>
+</head>
+<body>
+<div id="loader">Tilling the soil…</div>
+<script src="./wasm_exec.js"></script>
+<script>
+  (async () => {
+    const loader = document.getElementById("loader");
+    try {
+      const go = new Go();
+      const result = await WebAssembly.instantiateStreaming(fetch("./game.wasm"), go.importObject);
+      loader.classList.add("hidden");
+      go.run(result.instance);
+    } catch (err) {
+      loader.classList.add("failed");
+      loader.textContent = "Failed to load";
+      console.error(err);
+    }
+  })();
+</script>
+</body>
+</html>
