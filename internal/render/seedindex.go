@@ -75,7 +75,19 @@ func (g *Game) handleSeedIndexClick(mx, my int) {
 		g.uiState.CloseSeedIndex()
 		return
 	}
-	for _, row := range g.seedIndexLayout().rows {
+	rows := g.seedIndexLayout().rows
+	// Alt turns the whole row into an inspect target, including its buttons —
+	// alt-clicking Sow should show you the plant, not sow it.
+	if ebiten.IsKeyPressed(ebiten.KeyAlt) {
+		for _, row := range rows {
+			if row.rect.contains(mx, my) {
+				g.inspectSeed(row.stack)
+				return
+			}
+		}
+		return
+	}
+	for _, row := range rows {
 		switch {
 		case row.sow.contains(mx, my):
 			g.selectSeed(row.stack)
@@ -103,9 +115,9 @@ func (g *Game) drawSeedIndex(dst *ebiten.Image) {
 		g.drawIndexRow(dst, row)
 	}
 
-	footer := "click a line to sow it, or discard one you are done with   ·   Esc to close"
+	footer := "sow a line, discard one you are done with, or Alt+click to inspect it   ·   Esc to close"
 	if l.total > indexRows {
-		footer = fmt.Sprintf("showing %d–%d of %d   ·   scroll to see more   ·   Esc to close",
+		footer = fmt.Sprintf("showing %d–%d of %d   ·   scroll for more   ·   Alt+click to inspect   ·   Esc to close",
 			g.uiState.SeedIndexScroll+1, g.uiState.SeedIndexScroll+len(l.rows), l.total)
 	}
 	drawText(dst, footer, fontSmall, indexX+indexPad, indexY+indexH-indexFootH+10, colorTextMuted)

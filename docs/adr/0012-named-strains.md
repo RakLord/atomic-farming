@@ -15,13 +15,19 @@ A naming system fixes that: a plant whose genes match a known pattern gets a nam
 
 ```go
 type NamedStrain struct {
-    Match     func(p plant.Phenotype) bool  // a predicate over expressed traits
-    Signature *plant.Genome                 // one exact genome
+    Conditions []GeneCondition   // requirements on expressed traits
+    Signature  *plant.Genome     // one exact genome
     // ... plus ID, Name, Goal, Rarity, Kind, Specificity
 }
 ```
 
-A **predicate** is a condition over visible traits — "Density ≥ 210 on a stem thicker than 200". Because it describes conditions rather than a point in gene-space, it is *reachable by breeding*, and its `Goal` field doubles as a target the UI can state plainly. This is what turns breeding from a slot machine into a puzzle.
+**Conditions** are requirements on visible traits — "Density ≥ 210 on a stem thicker than 200" — all of which must hold. Because they describe conditions rather than a point in gene-space, such a strain is *reachable by breeding*, which is what turns breeding from a slot machine into a puzzle.
+
+They are **data rather than a closure**, so the game can report how far a plant is from a strain (`Density 152/210`) instead of only whether it arrived. That is what the plant inspector shows, and it is the difference between a name that appears and a goal you can work toward.
+
+A closure could express more — a sum across two genes, say. But a requirement that cannot be stated as gene bands is one the player cannot aim at either, so the restriction keeps the catalog honest rather than limiting it. A single `GeneCondition` covers every shape needed so far because it carries an `Outside` flag: Gnarlroot's "bent hard either way" is one inverted band rather than two alternatives, which is why no `Any`/`All` split is needed.
+
+Restating the four shipped predicates as data risked silently changing what they mean, so the original closures are kept verbatim in `strainrewrite_test.go` as the reference and compared against the conditions across 40,000 genomes each.
 
 A **signature** is a single exact genome. Reaching it by breeding is effectively impossible — 45 genes × 2 alleles all matching — which is precisely why it suits handcrafted legendaries that arrive as a bought seed. Voidshoot is one.
 

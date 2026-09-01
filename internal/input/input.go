@@ -152,6 +152,27 @@ func DiscardSeed(s *sim.GameState, u *ui.UIState, index int) {
 	}
 }
 
+// InspectPlot opens the inspector on whatever is growing at p.
+func InspectPlot(s *sim.GameState, u *ui.UIState, p sim.Position, ok bool) {
+	if s == nil || u == nil || !ok {
+		return
+	}
+	plot, found := s.Grid.At(p)
+	if !found || plot.Crop == nil {
+		u.Notify("Nothing growing there to inspect")
+		return
+	}
+	u.InspectPlant(plot.Crop.Kind(), plot.Genome, p)
+}
+
+// InspectSeed opens the inspector on a seed line that has not been sown.
+func InspectSeed(s *sim.GameState, u *ui.UIState, index int) {
+	if s == nil || u == nil || index < 0 || index >= len(s.Inventory.Stacks) {
+		return
+	}
+	u.InspectSeedStack(s.Inventory.Stacks[index])
+}
+
 // SelectSeed queues an inventory stack for planting.
 func SelectSeed(s *sim.GameState, u *ui.UIState, index int) {
 	if s == nil || u == nil || index < 0 || index >= len(s.Inventory.Stacks) {

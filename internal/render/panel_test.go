@@ -92,3 +92,75 @@ func TestTooltipsNameTheButtonUnderTheCursor(t *testing.T) {
 		t.Error("the row body reported a tooltip")
 	}
 }
+
+// TestInspectorClosesWhenItsPlantIsHarvested: the panel reads growth from the
+// live plot, so an inspected crop that gets gathered would otherwise leave a
+// ghost on screen.
+func TestInspectorClosesWhenItsPlantIsHarvested(t *testing.T) {
+	s := sim.NewGameStateWithSeed(3)
+	pos := sim.Position{}
+	if err := s.PlantSeed(pos, 0); err != nil {
+		t.Fatalf("PlantSeed: %v", err)
+	}
+	plot, _ := s.Grid.At(pos)
+
+	u := ui.NewUIState()
+	u.InspectPlant(crops.KindStem, plot.Genome, pos)
+	g := New(s, u, func() error { return nil })
+
+	if in := g.inspectedPlant(); !in.ok || !in.hasGrowth {
+		t.Fatal("the inspector cannot see the plant it is looking at")
+	}
+
+	if err := s.Uproot(pos); err != nil {
+		t.Fatalf("Uproot: %v", err)
+	}
+	// The snapshot still renders, so the panel cannot crash mid-frame...
+	if in := g.inspectedPlant(); !in.ok || in.hasGrowth {
+		t.Error("a gone plant still reports growth")
+	}
+	// ...but the next input tick closes it rather than showing a ghost.
+	g.handleInspectorInput()
+	if u.InspectOpen {
+		t.Error("the inspector stayed open over an empty plot")
+	}
+}
+
+// TestInspectorUsesSpeciesRangesNotTheFullGenome is the reason this is not the
+// lab: the lab expresses with ExpressFull, which would report a Stem's Growth
+// Rate against a window it does not have.
+func TestInspectorUsesSpeciesRangesNotTheFullGenome(t *testing.T) {
+	s := sim.NewGameStateWithSeed(3)
+	g := plant.DefaultGenome()
+	g[plant.GeneGrowthRate] = plant.GenePair{A: 0, B: 0}
+
+	u := ui.NewUIState()
+	u.InspectSeedStack(sim.SeedStack{Kind: crops.KindStem, Genome: g, Count: 1})
+	game := New(s, u, func() error { return nil })
+
+	in := game.inspectedPlant()
+	if !in.ok {
+		t.Fatal("the inspector has nothing to show")
+	}
+	full := plant.ExpressFull(g).Get(plant.GeneGrowthRate)
+	species := in.pheno.Get(plant.GeneGrowthRate)
+	if species == full {
+		t.Fatal("the inspector expressed with the full range; a Stem's window starts above zero")
+	}
+	if want := (&crops.Stem{}).Ranges()[plant.GeneGrowthRate].Min; species != uint8(want) {
+		t.Errorf("Growth Rate reads %d, want the species floor %d", species, want)
+	}
+}
+
+func TestCarrierCountFindsHiddenAlleles(t *testing.T) {
+	g := plant.DefaultGenome()
+	if got := carrierCount(g); got != 0 {
+		t.Errorf("a homozygous genome reports %d carriers, want 0", got)
+	}
+
+	g[plant.GeneDensity] = plant.GenePair{A: 240, B: 40}
+	g[plant.GeneStemHeight] = plant.GenePair{A: 100, B: 101} // below the noise floor
+	if got := carrierCount(g); got != 1 {
+		t.Errorf("carrierCount = %d, want 1 — a one-step difference is noise, not a hidden allele", got)
+	}
+}

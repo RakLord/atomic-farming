@@ -35,13 +35,13 @@ func TestEveryPredicateStrainIsReachable(t *testing.T) {
 
 	for _, id := range sim.StrainCatalogOrder {
 		strain := sim.StrainCatalog[id]
-		if strain.Match == nil || strain.Kind != KindStem {
+		if !strain.Breedable() || strain.Kind != KindStem {
 			continue
 		}
 		found := false
 		for seed := uint64(0); seed < samples && !found; seed++ {
 			g := homozygousGenome(seed)
-			if strain.Match(plant.Express(g, stem.Ranges())) {
+			if strain.Matches(g, plant.Express(g, stem.Ranges())) {
 				found = true
 			}
 		}

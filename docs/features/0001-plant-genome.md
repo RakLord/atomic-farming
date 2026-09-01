@@ -104,6 +104,22 @@ A cross draws one allele from each parent for every gene (meiosis), then applies
 
 Because a child's alleles are always literally its parents', a rare extreme allele passes down intact even while it is not expressed. That is what lets a breeding line keep improving instead of converging on the average.
 
+## The inspector
+
+**Alt+click a growing plant, or a line in the seed index**, to open the inspector: every gene, the alleles it holds, and what it actually expresses through its species' ranges.
+
+Genes whose two alleles differ noticeably are **highlighted in amber**. This is the diploid model's payoff and it is invisible everywhere else in the game: a plant showing Density 152 while carrying `245/60` has a 245 to give that it is not currently expressing, and breeding two such plants can bring it out. The count sits under the preview — *"5 genes carry a hidden allele"*.
+
+Below that, every strain the crop can become, with each requirement measured against the plant:
+
+```
+Ironstem                          Rare
+  □ Density                152 / 210+
+  ■ Stem Thickness         233 / 200+
+```
+
+A filled marker is a requirement met. Signature strains say plainly that they cannot be bred.
+
 ## Looking at plants
 
 ```bash

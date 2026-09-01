@@ -26,7 +26,7 @@ func withStrains(t *testing.T, strains ...NamedStrain) {
 func denseStrain(id StrainID, threshold uint8, specificity int) NamedStrain {
 	return NamedStrain{
 		ID: id, Name: string(id), Rarity: RarityRare, Specificity: specificity,
-		Match: func(p plant.Phenotype) bool { return p.Get(plant.GeneDensity) >= threshold },
+		Conditions: []GeneCondition{{Gene: plant.GeneDensity, Min: threshold, Max: 255}},
 	}
 }
 
@@ -106,7 +106,7 @@ func TestIdentifyStrainIsStableAcrossCalls(t *testing.T) {
 func TestStrainsAreScopedToTheirSpecies(t *testing.T) {
 	withStrains(t, NamedStrain{
 		ID: "otherspecies", Name: "Other", Kind: "not_the_test_crop", Specificity: 10,
-		Match: func(p plant.Phenotype) bool { return true },
+		Conditions: []GeneCondition{{Gene: plant.GeneDensity, Min: 0, Max: 255}},
 	})
 	g := plant.DefaultGenome()
 	if s, ok := IdentifyStrain(kindTestCrop, g, plant.ExpressFull(g)); ok {
@@ -150,13 +150,15 @@ func TestDiscoveredCountIgnoresUnknownStrains(t *testing.T) {
 }
 
 func TestRegisterStrainRejectsMalformedEntries(t *testing.T) {
-	always := func(p plant.Phenotype) bool { return true }
+	always := []GeneCondition{{Gene: plant.GeneDensity, Min: 0, Max: 255}}
 	g := plant.DefaultGenome()
 	cases := map[string]NamedStrain{
-		"no ID":           {Name: "x", Match: always},
-		"no name":         {ID: "x", Match: always},
+		"no ID":           {Name: "x", Conditions: always},
+		"no name":         {ID: "x", Conditions: always},
 		"neither matcher": {ID: "x", Name: "x"},
-		"both matchers":   {ID: "x", Name: "x", Match: always, Signature: &g},
+		"both matchers":   {ID: "x", Name: "x", Conditions: always, Signature: &g},
+		"unknown gene":    {ID: "x", Name: "x", Conditions: []GeneCondition{{Gene: plant.GeneID(-1), Max: 255}}},
+		"inverted band":   {ID: "x", Name: "x", Conditions: []GeneCondition{{Gene: plant.GeneDensity, Min: 200, Max: 100}}},
 	}
 	for name, s := range cases {
 		t.Run(name, func(t *testing.T) {

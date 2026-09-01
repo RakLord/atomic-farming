@@ -151,8 +151,9 @@ func registerStemStrains() {
 		Rarity:      sim.RarityRare,
 		Kind:        KindStem,
 		Specificity: 20,
-		Match: func(p plant.Phenotype) bool {
-			return p.Get(plant.GeneDensity) >= 210 && p.Get(plant.GeneStemThickness) >= 200
+		Conditions: []sim.GeneCondition{
+			{Gene: plant.GeneDensity, Min: 210, Max: 255},
+			{Gene: plant.GeneStemThickness, Min: 200, Max: 255},
 		},
 	})
 	sim.RegisterStrain(sim.NamedStrain{
@@ -163,8 +164,9 @@ func registerStemStrains() {
 		Rarity:      sim.RarityUncommon,
 		Kind:        KindStem,
 		Specificity: 15,
-		Match: func(p plant.Phenotype) bool {
-			return p.Get(plant.GeneStemHeight) >= 235 && p.Get(plant.GeneGrowthRate) >= 210
+		Conditions: []sim.GeneCondition{
+			{Gene: plant.GeneStemHeight, Min: 235, Max: 255},
+			{Gene: plant.GeneGrowthRate, Min: 210, Max: 255},
 		},
 	})
 	sim.RegisterStrain(sim.NamedStrain{
@@ -175,8 +177,9 @@ func registerStemStrains() {
 		Rarity:      sim.RarityUncommon,
 		Kind:        KindStem,
 		Specificity: 15,
-		Match: func(p plant.Phenotype) bool {
-			return p.Get(plant.GeneStemSat) <= 40 && p.Get(plant.GeneStemLum) >= 205
+		Conditions: []sim.GeneCondition{
+			{Gene: plant.GeneStemSat, Min: 0, Max: 40},
+			{Gene: plant.GeneStemLum, Min: 205, Max: 255},
 		},
 	})
 	sim.RegisterStrain(sim.NamedStrain{
@@ -187,9 +190,11 @@ func registerStemStrains() {
 		Rarity:      sim.RarityRare,
 		Kind:        KindStem,
 		Specificity: 20,
-		Match: func(p plant.Phenotype) bool {
-			curve := p.Get(plant.GeneStemCurve)
-			return (curve <= 25 || curve >= 230) && p.Get(plant.GeneStemHeight) <= 90
+		Conditions: []sim.GeneCondition{
+			// Bent hard either way: one inverted band rather than two
+			// alternatives.
+			{Gene: plant.GeneStemCurve, Min: 26, Max: 229, Outside: true},
+			{Gene: plant.GeneStemHeight, Min: 0, Max: 90},
 		},
 	})
 	sim.RegisterStrain(sim.NamedStrain{

@@ -92,6 +92,13 @@ func (g *Game) handleInput() {
 		return
 	}
 
+	// The inspector is checked before the seed index, so a line inspected from
+	// the index returns to it when closed.
+	if g.uiState.InspectOpen {
+		g.handleInspectorInput()
+		return
+	}
+
 	if g.uiState.SeedIndexOpen {
 		g.handleSeedIndexInput()
 		return
@@ -108,8 +115,14 @@ func (g *Game) handleInput() {
 		g.handlePanelClick(mx, my)
 		return
 	}
+	if ebiten.IsKeyPressed(ebiten.KeyAlt) {
+		input.InspectPlot(g.state, g.uiState, pos, onFarm)
+		return
+	}
 	input.ClickPlot(g.state, g.uiState, pos, onFarm)
 }
+
+func (g *Game) inspectSeed(index int) { input.InspectSeed(g.state, g.uiState, index) }
 
 func (g *Game) buySeed(id sim.SeedOfferID) { input.BuySeed(g.state, g.uiState, id) }
 func (g *Game) buyUnlock(id sim.UnlockID)  { input.BuyUnlock(g.state, g.uiState, id) }
@@ -157,6 +170,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.drawPanel(screen)
 	if g.uiState.SeedIndexOpen {
 		g.drawSeedIndex(screen)
+	}
+	if g.uiState.InspectOpen {
+		g.drawInspector(screen)
 	}
 	if g.lab.Open {
 		g.drawLab(screen)

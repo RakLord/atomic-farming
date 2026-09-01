@@ -283,3 +283,67 @@ func TestDiscardIgnoresBadIndices(t *testing.T) {
 		t.Error("an out-of-range discard changed the inventory")
 	}
 }
+
+func TestInspectingAPlantSnapshotsIt(t *testing.T) {
+	s, u := newGame()
+	pos := sim.Position{X: 1, Y: 1}
+	SelectSeed(s, u, 0)
+	ClickPlot(s, u, pos, true)
+
+	plot, _ := s.Grid.At(pos)
+	want := plot.Genome
+
+	InspectPlot(s, u, pos, true)
+	if !u.InspectOpen {
+		t.Fatal("inspecting a planted crop did not open the inspector")
+	}
+	if u.InspectGenome != want {
+		t.Error("the inspector did not take the plant's genome")
+	}
+	if u.InspectKind != crops.KindStem || !u.InspectFromPlot {
+		t.Errorf("inspector state = %q fromPlot=%v, want the stem from a plot", u.InspectKind, u.InspectFromPlot)
+	}
+	if u.InspectPos != pos {
+		t.Error("the inspector did not record which plot it is looking at")
+	}
+}
+
+func TestInspectingBareSoilSaysSo(t *testing.T) {
+	s, u := newGame()
+	InspectPlot(s, u, sim.Position{}, true)
+	if u.InspectOpen {
+		t.Error("the inspector opened on an empty plot")
+	}
+	if !strings.Contains(u.Notice, "Nothing growing") {
+		t.Errorf("notice was %q, want an explanation", u.Notice)
+	}
+
+	InspectPlot(s, u, sim.Position{}, false)
+	if u.InspectOpen {
+		t.Error("the inspector opened on a click that was off the farm")
+	}
+}
+
+func TestInspectingASeedNeedsNoPlot(t *testing.T) {
+	s, u := newGame()
+	s.Inventory = sim.Inventory{}
+	g := plant.RandomGenome(51)
+	s.Inventory.Add(crops.KindStem, g, 2)
+
+	InspectSeed(s, u, 0)
+	if !u.InspectOpen {
+		t.Fatal("inspecting a seed did not open the inspector")
+	}
+	if u.InspectGenome != g {
+		t.Error("the inspector did not take the seed's genome")
+	}
+	if u.InspectFromPlot {
+		t.Error("a seed was recorded as coming from a plot; there is no growth to read")
+	}
+
+	u.CloseInspector()
+	InspectSeed(s, u, 99)
+	if u.InspectOpen {
+		t.Error("an out-of-range seed opened the inspector")
+	}
+}

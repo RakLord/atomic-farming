@@ -60,7 +60,14 @@ var (
 	// from an on one is not a toggle anybody can read at a glance.
 	colorIconOff = color.RGBA{0x4a, 0x55, 0x49, 0xff}
 	colorTooltip = color.RGBA{0x08, 0x0d, 0x09, 0xf2}
+	// A gene whose two alleles differ is carrying something it is not showing.
+	colorCarrier = color.RGBA{0xd8, 0xb0, 0x4a, 0xff}
+	colorMet     = color.RGBA{0x8e, 0xd9, 0x6a, 0xff}
+	colorUnmet   = color.RGBA{0x9a, 0x6a, 0x6a, 0xff}
 )
+
+// colorRGBA names the concrete colour type the palette uses.
+type colorRGBA = color.RGBA
 
 // rarityColors tint a strain's name so a find reads as a find.
 var rarityColors = [4]color.RGBA{

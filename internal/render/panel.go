@@ -387,6 +387,10 @@ func (g *Game) drawPlotDetail(dst *ebiten.Image, y int) {
 	drawText(dst, status, fontSmall, x, y, colorTextMuted)
 	y += 18
 	drawText(dst, "Strain "+plot.Genome.Label(), fontSmall, x, y, colorTextMuted)
+	y += 18
+	// Alt+click is invisible; without saying so the inspector may as well not
+	// exist.
+	drawText(dst, "Alt+click to inspect its genome", fontSmall, x, y, colorCarrier)
 }
 
 func (g *Game) drawNotice(dst *ebiten.Image) {

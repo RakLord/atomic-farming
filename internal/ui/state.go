@@ -30,6 +30,16 @@ type UIState struct {
 	SeedIndexKind   sim.CropKind
 	SeedIndexScroll int
 
+	// The plant inspector: a read-only look at one genome. The genome and
+	// species are snapshotted so the panel still renders if the plot is
+	// harvested mid-look; InspectPos is kept so a planted crop's growth can be
+	// read live and watched as it ripens.
+	InspectOpen     bool
+	InspectKind     sim.CropKind
+	InspectGenome   plant.Genome
+	InspectPos      sim.Position
+	InspectFromPlot bool
+
 	// Notice is the last action's result, shown briefly.
 	Notice      string
 	noticeTicks int
@@ -90,6 +100,20 @@ func (u *UIState) SeedIndex(inv *sim.Inventory) int {
 	}
 	return -1
 }
+
+// InspectPlant opens the inspector on a crop growing at pos.
+func (u *UIState) InspectPlant(kind sim.CropKind, g plant.Genome, pos sim.Position) {
+	u.InspectOpen, u.InspectKind, u.InspectGenome = true, kind, g
+	u.InspectPos, u.InspectFromPlot = pos, true
+}
+
+// InspectSeedStack opens the inspector on a seed that has not been sown.
+func (u *UIState) InspectSeedStack(stack sim.SeedStack) {
+	u.InspectOpen, u.InspectKind, u.InspectGenome = true, stack.Kind, stack.Genome
+	u.InspectFromPlot = false
+}
+
+func (u *UIState) CloseInspector() { u.InspectOpen = false }
 
 // Notify shows a message for a short while.
 func (u *UIState) Notify(msg string) {
